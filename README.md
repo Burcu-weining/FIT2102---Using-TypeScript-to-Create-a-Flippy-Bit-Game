@@ -69,3 +69,4 @@ src/
   view.ts        -- rendering
   observable.ts  -- functions to create Observable streams
 ```
+#testing if commit messages work properly.
