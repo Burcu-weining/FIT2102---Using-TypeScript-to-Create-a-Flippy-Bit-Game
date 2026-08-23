@@ -27,7 +27,9 @@ import {
     take,
 } from "rxjs";
 
-/** Constants */
+/** Constants
+ * These will control the sonstants throughout the game
+ */
 
 const Viewport = {
     CANVAS_WIDTH: 600,
@@ -45,40 +47,42 @@ const Constants = {
 } as const;
 
 type Bit = 0 | 1; //bit can be 0 or 1
-type DigitBank = readonly [Bit, Bit, Bit, Bit, Bit, Bit, Bit, Bit]; //this is a immutable tuple containing 8 digits, a normal bit could contain any number of digits, hence a tuple is safer.
-type FallingTargetView = Readonly<{
-    //this shows the falling target view
-    id: number;
-    hexadecimalValue: number;
-    verticalPosition: number;
-}>;
+type BinaryDigits = readonly [Bit, Bit, Bit, Bit, Bit, Bit, Bit, Bit]; //this is a immutable tuple containing 8 digits, the player's binary number contains exactly eight bits
 
+/*
+state contains all the info needed to describe the game
+*/
 // State processing
 type State = Readonly<{
     //state holds the games current information
-    digitBank: DigitBank;
-    healthReserve: number;
-    allCurrentTargetsInPlay: ReadonlyArray<FallingTargetView>;
+    binaryDigits: BinaryDigits;
     gameEnd: boolean;
 }>;
 
-type GameEvent =
-    | Readonly<{ type: "Tick" }>
-    | Readonly<{ type: "FlipDigit"; index: number }>;
 
+type GameEvent = //events describe things that can change the game state
+    | Readonly<{ type: "Tick" }>  //tick represents time passing
+    | Readonly<{ type: "FlipBinaryDigit"; index: number }>;  //flipbinarydigit represents a number key being pressed
+
+// The game begins with all 8 binary digits being 0.
 const initialState: State = {
-    digitBank: [0, 0, 0, 0, 0, 0, 0, 0],
-    healthReserve: 1,
-    allCurrentTargetsInPlay: [],
+    binaryDigits: [0, 0, 0, 0, 0, 0, 0, 0],
     gameEnd: false,
 };
 
-const flipBit = (bit: Bit): Bit => (bit === 0 ? 1 : 0);
+const flipBit = (bit: Bit): Bit => (bit === 0 ? 1 : 0);  //this converts 0 to 1 pr 1 to 0
 
-const flipDigit = (digitBank: DigitBank, selectedIndex: number): DigitBank =>
-    digitBank.map((bit, index) =>
+/*
+this part returns a new set of binary digits with one selected digit that would be flipped
+and the original binary digits are not modified.
+*/
+const flipBinaryDigit = (
+    binaryDigits: BinaryDigits,
+    selectedIndex: number,
+): BinaryDigits =>
+    binaryDigits.map((bit, index) =>
         index === selectedIndex ? flipBit(bit) : bit,
-    ) as unknown as DigitBank;
+    ) as unknown as BinaryDigits;
 
 /**
  * Updates the state by proceeding with one time step.
@@ -86,17 +90,35 @@ const flipDigit = (digitBank: DigitBank, selectedIndex: number): DigitBank =>
  * @param s Current state
  * @returns Updated state
  */
-const tick = (state: State): State => state; //an identity function, it returns the same state (pure)
+const tick = (state: State): State => state;
+
+
+/**
+ * Produces the next state from the current state
+ *
+ * This function is pure:
+ * - it does not modify the existing state;
+ * - it does not update the html;
+ * - the same inputs always produce the same output.
+ */
+
+const reduceState = (state: State, event: GameEvent): State => {
+    switch (event.type) {
+        case "FlipBinaryDigit":
+            return {
+                ...state,
+                binaryDigits: flipBinaryDigit(
+                    state.binaryDigits,
+                    event.index,
+                ),
+            };
+
+        case "Tick":
+            return state;
+    }
+};
 
 // Rendering (side effects)
-
-const reduceState = (state: State, gameEvent: GameEvent): State =>
-    gameEvent.type === "FlipDigit"
-        ? {
-              ...state,
-              digitBank: flipDigit(state.digitBank, gameEvent.index),
-          }
-        : tick(state);
 
 /**
  * Brings an SVG element to the foreground.
@@ -151,6 +173,8 @@ const render = (): ((s: State) => void) => {
         "viewBox",
         `0 0 ${Viewport.CANVAS_WIDTH} ${Viewport.CANVAS_HEIGHT}`,
     );
+
+
     /**
      * Renders the current state to the canvas.
      *
@@ -184,12 +208,13 @@ const render = (): ((s: State) => void) => {
         // Draw the row of digit toggles as a demonstration
         const digitWidth = Viewport.CANVAS_WIDTH / Constants.DIGIT_COUNT;
         Array.from({ length: Constants.DIGIT_COUNT }).forEach((_, i) => {
-            const bit = createSvgElement(svg.namespaceURI, "rect", {
+            const currentBit = s.binaryDigits[i];
+            const bitRectangle = createSvgElement(svg.namespaceURI, "rect", {
                 x: `${i * digitWidth + 4}`,
                 y: `${Viewport.CANVAS_HEIGHT - 50}`,
                 width: `${digitWidth - 8}`,
                 height: "40",
-                fill: "#ef9a9a",
+                fill: currentBit === 1 ? "#81c784" : "#ef9a9a",
                 stroke: "black",
                 "stroke-width": "2",
             });
@@ -200,8 +225,8 @@ const render = (): ((s: State) => void) => {
                 "font-family": "monospace",
                 fill: "black",
             });
-            bitText.textContent = "0";
-            svg.appendChild(bit);
+            bitText.textContent = String(currentBit);
+            svg.appendChild(bitRectangle);
             svg.appendChild(bitText);
         });
     };
@@ -213,17 +238,17 @@ export const state$ = (): Observable<State> => {
     );
 
     const digitKey$ = fromEvent<KeyboardEvent>(document, "keydown").pipe(
-        filter(({ code }) => /^Digit[1-8]$/.test(code)),
+        filter(({ code }) => /^Digit[1-8]$/.test(code)),  //only keyboard keys 1-8 are allowed
         map(
             ({ code }): GameEvent => ({
-                type: "FlipDigit",
-                index: Number(code.at(-1)) - 1,
+                type: "FlipBinaryDigit",
+                index: Number(code.at(-1)) - 1,  //array starts at index 0
             }),
         ),
     );
 
-    return merge(tick$, digitKey$).pipe(scan(reduceState, initialState));
-};
+    return merge(tick$, digitKey$).pipe(scan(reduceState, initialState));  //this combines the timer events and keyboard events
+};  //scan remembers the previous state and uses the reducer to calculate the next one
 
 // The following simply runs your main function on window load.  Make sure to leave it in place.
 // You should not need to change this, beware if you are.
