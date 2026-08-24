@@ -45,7 +45,7 @@ const Constants = {
     DIGIT_COUNT: 8,
     TICK_RATE_MS: 100, // this updates the state 10 times per second
     TARGET_SPEED: 2, // this moves each target two SVG units on every tick
-    TARGET_SPAWN_TICKS: 20, // creates a new target every 2 seconds
+    TARGET_SPAWN_MS: 2000, // creates a new target every 2 seconds
     CHECK_LINE_Y: 300, // targets are checked at this horizontal line
 } as const;
 
@@ -87,22 +87,19 @@ type State = Readonly<{
     //state holds the games current information
     binaryDigits: BinaryDigits;
     targets: ReadonlyArray<FallingTarget>;  //every target currently falling on the screen
-    nextTargetId: number; // give each target a unique ID
-    tickCount: number;  //counts how many timer ticks have occured
     gameEnd: boolean;
 }>;
 
 
 type GameEvent = //events describe things that can change the game state
     | Readonly<{ type: "Tick" }>  //tick represents time passing
-    | Readonly<{ type: "FlipBinaryDigit"; index: number }>;  //flipbinarydigit represents a number key being pressed
+    | Readonly<{ type: "FlipBinaryDigit"; index: number }>  //flipbinarydigit represents a number key being pressed
+    | Readonly<{ type: "SpawnTarget"; target: FallingTarget;}>;
 
-// The game begins with all 8 binary digits being 0.
+    // The game begins with all 8 binary digits being 0.
 const initialState: State = {
     binaryDigits: [0, 0, 0, 0, 0, 0, 0, 0],
     targets: [],
-    nextTargetId: 0,
-    tickCount: 0,
     gameEnd: false,
 };
 
@@ -142,15 +139,16 @@ const binaryToDecimal = (binaryDigits: BinaryDigits): number =>
  *
  * The remainder  makes the sequence repeat after it ended
  */
-const createTarget = (id: number): FallingTarget => ({
+const createTarget = (
+    id: number,
+    hexadecimalValue: number,
+): FallingTarget => ({
     id,
+    hexadecimalValue,
+    y: -Target.HEIGHT,   // Begin just above the visible box in the game
 
-    hexadecimalValue:
-        TARGET_SEQUENCE[id % TARGET_SEQUENCE.length],
-
-    // Begin just above the visible box in the game
-    y: -Target.HEIGHT,
 });
+
 
 /**
  * Finds the lowest target on the screen.
@@ -185,7 +183,7 @@ const tick = (state: State): State => {
         return state;
     }
 
-    const nextTickCount = state.tickCount + 1;
+
 
     /**
      * Create a new array containing moved targets.
@@ -197,38 +195,15 @@ const tick = (state: State): State => {
         y: target.y + Constants.TARGET_SPEED,
     }));
 
-    const shouldCreateTarget =
-        nextTickCount % Constants.TARGET_SPAWN_TICKS === 0;
+    const lowestTarget = getLowestTarget(movedTargets);
 
-    /**
-     * If it is time to create a target, append a new one.
-     * Otherwise, continue with only the moved targets.
-     */
-    const targetsAfterCreation = shouldCreateTarget
-        ? [...movedTargets, createTarget(state.nextTargetId)]
-        : movedTargets;
-
-    const nextTargetId = shouldCreateTarget
-        ? state.nextTargetId + 1
-        : state.nextTargetId;
-
-    const lowestTarget = getLowestTarget(targetsAfterCreation);
-
-    /**
-     * There may be no targets during the first two seconds.
-     */
-    if (lowestTarget === undefined) {
+    if (lowestTarget === undefined) {  //there is nothing to check when the screen has no targets
         return {
             ...state,
-            targets: targetsAfterCreation,
-            nextTargetId,
-            tickCount: nextTickCount,
+            targets: movedTargets,
         };
     }
 
-    /**
-     * The target reaches the line when its bottom edge touches it.
-     */
     const targetReachedCheckLine =
         lowestTarget.y + Target.HEIGHT >=
         Constants.CHECK_LINE_Y;
@@ -236,47 +211,30 @@ const tick = (state: State): State => {
     if (!targetReachedCheckLine) {
         return {
             ...state,
-            targets: targetsAfterCreation,
-            nextTargetId,
-            tickCount: nextTickCount,
+            targets: movedTargets,
         };
     }
 
     const playerValue = binaryToDecimal(state.binaryDigits);
 
     const answerIsCorrect =
-        playerValue === lowestTarget.hexadecimalValue;
+        playerValue === lowestTarget?.hexadecimalValue;
 
-    if (answerIsCorrect) {
-        /**
-         * Remove only the resolved target.
-         *
-         * filter creates a new array and leaves the existing target
-         * array unchanged.
-         */
+    if (answerIsCorrect) {  //this resolves only the lowest target and the targets above it remains in the array
         return {
             ...state,
-            targets: targetsAfterCreation.filter(
+            targets: movedTargets.filter(
                 target => target.id !== lowestTarget.id,
             ),
-            nextTargetId,
-            tickCount: nextTickCount,
         };
     }
 
-    /**
-     * The target reached the line with an incorrect answer.
-     */
     return {
         ...state,
-        targets: targetsAfterCreation,
-        nextTargetId,
-        tickCount: nextTickCount,
+        targets: movedTargets,
         gameEnd: true,
     };
 };
-
-
 /**
  * Produces the next state from the current state
  *
@@ -295,9 +253,6 @@ const reduceState = (
 ): State => {
     switch (event.type) {
         case "FlipBinaryDigit":
-            /**
-             * Ignore keyboard controls after the game has ended.
-             */
             return state.gameEnd
                 ? state
                 : {
@@ -307,6 +262,18 @@ const reduceState = (
                           event.index,
                       ),
                   };
+
+        case "SpawnTarget":
+            return state.gameEnd
+                ? state
+                : {
+                    ...state,
+
+                    targets: [
+                        ...state.targets,
+                        event.target,
+                    ],
+                };
 
         case "Tick":
             return tick(state);
@@ -534,8 +501,36 @@ export const state$ = (): Observable<State> => {
         map((): GameEvent => ({ type: "Tick" })),
     );
 
+  /**
+     * Target-creation stream.
+     *
+     * interval emits increasing numbers:
+     * 0, 1, 2, 3, ...
+     *
+     * We use each emitted number as the target's unique ID.
+     */
+  const spawnTarget$ = interval(
+    Constants.TARGET_SPAWN_MS,
+).pipe(
+    map((id): GameEvent => {
+        const hexadecimalValue =
+            TARGET_SEQUENCE[
+                id % TARGET_SEQUENCE.length
+            ];
+
+        return {
+            type: "SpawnTarget",
+            target: createTarget(
+                id,
+                hexadecimalValue,
+            ),
+        };
+    }),
+);
+
+
     const digitKey$ = fromEvent<KeyboardEvent>(document, "keydown").pipe(
-        filter(({ code }) => /^Digit[1-8]$/.test(code)),  //only keyboard keys 1-8 are allowed
+        filter(({ code, repeat }) => !repeat && /^Digit[1-8]$/.test(code)),  //only keyboard keys 1-8 are allowed
         map(
             ({ code }): GameEvent => ({
                 type: "FlipBinaryDigit",
@@ -544,7 +539,7 @@ export const state$ = (): Observable<State> => {
         ),
     );
 
-    return merge(tick$, digitKey$).pipe(scan(reduceState, initialState));  //this combines the timer events and keyboard events
+    return merge(tick$, spawnTarget$, digitKey$).pipe(scan(reduceState, initialState));  //this combines the timer events and keyboard events
 };  //scan remembers the previous state and uses the reducer to calculate the next one
 
 // The following simply runs your main function on window load.  Make sure to leave it in place.
