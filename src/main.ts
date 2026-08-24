@@ -43,11 +43,41 @@ const Target = {
 
 const Constants = {
     DIGIT_COUNT: 8,
-    TICK_RATE_MS: 500, // Might need to change this!
+    TICK_RATE_MS: 100, // this updates the state 10 times per second
+    TARGET_SPEED: 2, // this moves each target two SVG units on every tick
+    TARGET_SPAWN_TICKS: 20, // creates a new target every 2 seconds
+    CHECK_LINE_Y: 300, // targets are checked at this horizontal line
 } as const;
+
+
+/*
+ * The minimum game may use a predefined sequence.
+ *
+ * The 0x prefix tells the code that these values are hexadecimal:
+ * 0x0d = decimal 13
+ * 0x2a = decimal 42
+ * 0x7f = decimal 127
+*/
+const TARGET_SEQUENCE = [0x0d, 0x2a, 0x07, 0x35, 0x7f] as const;
 
 type Bit = 0 | 1; //bit can be 0 or 1
 type BinaryDigits = readonly [Bit, Bit, Bit, Bit, Bit, Bit, Bit, Bit]; //this is a immutable tuple containing 8 digits, the player's binary number contains exactly eight bits
+
+
+/*
+We also need to define any falling target
+ */
+type FallingTarget = Readonly<{
+    // a unique number used to identify and remove this target
+    id: number;
+
+    // the numeric value the player must represent in binary
+    hexadecimalValue: number;
+
+    // the target's current vertical position
+    y: number;
+}>;
+
 
 /*
 state contains all the info needed to describe the game
@@ -56,6 +86,9 @@ state contains all the info needed to describe the game
 type State = Readonly<{
     //state holds the games current information
     binaryDigits: BinaryDigits;
+    targets: ReadonlyArray<FallingTarget>;  //every target currently falling on the screen
+    nextTargetId: number; // give each target a unique ID
+    tickCount: number;  //counts how many timer ticks have occured
     gameEnd: boolean;
 }>;
 
@@ -67,6 +100,9 @@ type GameEvent = //events describe things that can change the game state
 // The game begins with all 8 binary digits being 0.
 const initialState: State = {
     binaryDigits: [0, 0, 0, 0, 0, 0, 0, 0],
+    targets: [],
+    nextTargetId: 0,
+    tickCount: 0,
     gameEnd: false,
 };
 
@@ -84,13 +120,161 @@ const flipBinaryDigit = (
         index === selectedIndex ? flipBit(bit) : bit,
     ) as unknown as BinaryDigits;
 
+
+
 /**
- * Updates the state by proceeding with one time step.
+ * Converts the player's eight binary digits into a decimal number
  *
- * @param s Current state
- * @returns Updated state
+ * The calculation reads the bits from left to right
+ *
+ * Example:
+ * 00001101 becomes decimal 13.
  */
-const tick = (state: State): State => state;
+const binaryToDecimal = (binaryDigits: BinaryDigits): number =>
+    binaryDigits.reduce<number>(
+        (currentValue, bit) => currentValue * 2 + bit,
+        0,
+    );
+
+
+/**
+ * Creates one target using the predefined hexadecimal sequence
+ *
+ * The remainder  makes the sequence repeat after it ended
+ */
+const createTarget = (id: number): FallingTarget => ({
+    id,
+
+    hexadecimalValue:
+        TARGET_SEQUENCE[id % TARGET_SEQUENCE.length],
+
+    // Begin just above the visible box in the game
+    y: -Target.HEIGHT,
+});
+
+/**
+ * Finds the lowest target on the screen.
+ *
+ * A larger y-coordinate means that a target is lower on the grid
+ * The function returns undefined when there is no target
+ */
+const getLowestTarget = (
+    targets: ReadonlyArray<FallingTarget>,
+): FallingTarget | undefined =>
+    targets.reduce<FallingTarget | undefined>(
+        (lowestTarget, currentTarget) =>
+            lowestTarget === undefined ||
+            currentTarget.y > lowestTarget.y
+                ? currentTarget
+                : lowestTarget,
+        undefined,
+    );
+
+/**
+ * Moves the game forward by one time step.
+ *
+ * This function:
+ * 1. moves existing targets;
+ * 2. creates a target when required;
+ * 3. finds the lowest target;
+ * 4. checks it when it reaches the check line.
+ */
+const tick = (state: State): State => {
+    // A finished game should no longer move or create targets.
+    if (state.gameEnd) {
+        return state;
+    }
+
+    const nextTickCount = state.tickCount + 1;
+
+    /**
+     * Create a new array containing moved targets.
+     *
+     * map does not modify the objects in state.targets.
+     */
+    const movedTargets = state.targets.map(target => ({
+        ...target,
+        y: target.y + Constants.TARGET_SPEED,
+    }));
+
+    const shouldCreateTarget =
+        nextTickCount % Constants.TARGET_SPAWN_TICKS === 0;
+
+    /**
+     * If it is time to create a target, append a new one.
+     * Otherwise, continue with only the moved targets.
+     */
+    const targetsAfterCreation = shouldCreateTarget
+        ? [...movedTargets, createTarget(state.nextTargetId)]
+        : movedTargets;
+
+    const nextTargetId = shouldCreateTarget
+        ? state.nextTargetId + 1
+        : state.nextTargetId;
+
+    const lowestTarget = getLowestTarget(targetsAfterCreation);
+
+    /**
+     * There may be no targets during the first two seconds.
+     */
+    if (lowestTarget === undefined) {
+        return {
+            ...state,
+            targets: targetsAfterCreation,
+            nextTargetId,
+            tickCount: nextTickCount,
+        };
+    }
+
+    /**
+     * The target reaches the line when its bottom edge touches it.
+     */
+    const targetReachedCheckLine =
+        lowestTarget.y + Target.HEIGHT >=
+        Constants.CHECK_LINE_Y;
+
+    if (!targetReachedCheckLine) {
+        return {
+            ...state,
+            targets: targetsAfterCreation,
+            nextTargetId,
+            tickCount: nextTickCount,
+        };
+    }
+
+    const playerValue = binaryToDecimal(state.binaryDigits);
+
+    const answerIsCorrect =
+        playerValue === lowestTarget.hexadecimalValue;
+
+    if (answerIsCorrect) {
+        /**
+         * Remove only the resolved target.
+         *
+         * filter creates a new array and leaves the existing target
+         * array unchanged.
+         */
+        return {
+            ...state,
+            targets: targetsAfterCreation.filter(
+                target => target.id !== lowestTarget.id,
+            ),
+            nextTargetId,
+            tickCount: nextTickCount,
+        };
+    }
+
+    /**
+     * The target reached the line with an incorrect answer.
+     */
+    return {
+        ...state,
+        targets: targetsAfterCreation,
+        nextTargetId,
+        tickCount: nextTickCount,
+        gameEnd: true,
+    };
+};
 
 
 /**
@@ -102,19 +286,30 @@ const tick = (state: State): State => state;
  * - the same inputs always produce the same output.
  */
 
-const reduceState = (state: State, event: GameEvent): State => {
+/**
+ * Produces the next state from the current state and an event.
+ */
+const reduceState = (
+    state: State,
+    event: GameEvent,
+): State => {
     switch (event.type) {
         case "FlipBinaryDigit":
-            return {
-                ...state,
-                binaryDigits: flipBinaryDigit(
-                    state.binaryDigits,
-                    event.index,
-                ),
-            };
+            /**
+             * Ignore keyboard controls after the game has ended.
+             */
+            return state.gameEnd
+                ? state
+                : {
+                      ...state,
+                      binaryDigits: flipBinaryDigit(
+                          state.binaryDigits,
+                          event.index,
+                      ),
+                  };
 
         case "Tick":
-            return state;
+            return tick(state);
     }
 };
 
@@ -167,68 +362,170 @@ const createSvgElement = (
 };
 
 const render = (): ((s: State) => void) => {
-    const svg = document.querySelector("#svgCanvas") as SVGSVGElement;
+    const svg = document.querySelector(
+        "#svgCanvas",
+    ) as SVGSVGElement;
+
+    const gameOver = document.querySelector(
+        "#gameOver",
+    ) as SVGElement;
 
     svg.setAttribute(
         "viewBox",
         `0 0 ${Viewport.CANVAS_WIDTH} ${Viewport.CANVAS_HEIGHT}`,
     );
 
-
     /**
      * Renders the current state to the canvas.
      *
-     * In MVC terms, this updates the View using the Model.
-     *
-     * @param s Current state
+     * State processing is kept outside this function. Updating the
+     * SVG is a side effect, so it belongs in the rendering section.
      */
-    return (s: State) => {
-        // Draw a static falling target as a demonstration
-        const target = createSvgElement(svg.namespaceURI, "rect", {
-            x: `${Viewport.CANVAS_WIDTH / 2 - Target.WIDTH / 2}`,
-            y: "40",
-            width: `${Target.WIDTH}`,
-            height: `${Target.HEIGHT}`,
-            rx: "6",
-            fill: "white",
-            stroke: "black",
-            "stroke-width": "2",
+    return (s: State): void => {
+        /**
+         * Remove the elements created by the previous render.
+         *
+         * The game-over group from index.html is not removed because
+         * it does not have the "game-element" class.
+         */
+        svg.querySelectorAll(".game-element").forEach(element => {
+            element.remove();
         });
-        const targetText = createSvgElement(svg.namespaceURI, "text", {
-            x: `${Viewport.CANVAS_WIDTH / 2}`,
-            y: `${40 + Target.HEIGHT / 2 + 8}`,
-            "text-anchor": "middle",
-            "font-family": "monospace",
-            fill: "black",
-        });
-        targetText.textContent = "13";
-        svg.appendChild(target);
-        svg.appendChild(targetText);
 
-        // Draw the row of digit toggles as a demonstration
-        const digitWidth = Viewport.CANVAS_WIDTH / Constants.DIGIT_COUNT;
-        Array.from({ length: Constants.DIGIT_COUNT }).forEach((_, i) => {
-            const currentBit = s.binaryDigits[i];
-            const bitRectangle = createSvgElement(svg.namespaceURI, "rect", {
-                x: `${i * digitWidth + 4}`,
-                y: `${Viewport.CANVAS_HEIGHT - 50}`,
-                width: `${digitWidth - 8}`,
-                height: "40",
-                fill: currentBit === 1 ? "#81c784" : "#ef9a9a",
-                stroke: "black",
-                "stroke-width": "2",
-            });
-            const bitText = createSvgElement(svg.namespaceURI, "text", {
-                x: `${i * digitWidth + digitWidth / 2}`,
-                y: `${Viewport.CANVAS_HEIGHT - 22}`,
-                "text-anchor": "middle",
-                "font-family": "monospace",
-                fill: "black",
-            });
+        /**
+         * Draw the horizontal line where targets are checked.
+         */
+        const checkLine = createSvgElement(
+            svg.namespaceURI,
+            "line",
+            {
+                class: "game-element",
+                x1: "0",
+                y1: `${Constants.CHECK_LINE_Y}`,
+                x2: `${Viewport.CANVAS_WIDTH}`,
+                y2: `${Constants.CHECK_LINE_Y}`,
+                stroke: "yellow",
+                "stroke-width": "3",
+                "stroke-dasharray": "8 5",
+            },
+        );
+
+        svg.appendChild(checkLine);
+
+        /**
+         * Draw every target currently stored in state.
+         */
+        s.targets.forEach(target => {
+            const targetX =
+                Viewport.CANVAS_WIDTH / 2 -
+                Target.WIDTH / 2;
+
+            const targetRectangle = createSvgElement(
+                svg.namespaceURI,
+                "rect",
+                {
+                    class: "game-element",
+                    x: `${targetX}`,
+                    y: `${target.y}`,
+                    width: `${Target.WIDTH}`,
+                    height: `${Target.HEIGHT}`,
+                    rx: "6",
+                    fill: "white",
+                    stroke: "black",
+                    "stroke-width": "2",
+                },
+            );
+
+            const targetText = createSvgElement(
+                svg.namespaceURI,
+                "text",
+                {
+                    class: "game-element",
+                    x: `${Viewport.CANVAS_WIDTH / 2}`,
+                    y: `${target.y + Target.HEIGHT / 2 + 7}`,
+                    "text-anchor": "middle",
+                    "font-family": "monospace",
+                    "font-size": "20",
+                    fill: "black",
+                },
+            );
+
+            /**
+             * Display the value using hexadecimal characters.
+             *
+             * For example:
+             * decimal 13 becomes "D"
+             * decimal 42 becomes "2A"
+             */
+            targetText.textContent =
+                target.hexadecimalValue
+                    .toString(16)
+                    .toUpperCase();
+
+            svg.appendChild(targetRectangle);
+            svg.appendChild(targetText);
+        });
+
+        /**
+         * Draw the player's eight binary digits.
+         */
+        const digitWidth =
+            Viewport.CANVAS_WIDTH / Constants.DIGIT_COUNT;
+
+        Array.from({
+            length: Constants.DIGIT_COUNT,
+        }).forEach((_, index) => {
+            const currentBit = s.binaryDigits[index];
+
+            const bitRectangle = createSvgElement(
+                svg.namespaceURI,
+                "rect",
+                {
+                    class: "game-element",
+                    x: `${index * digitWidth + 4}`,
+                    y: `${Viewport.CANVAS_HEIGHT - 50}`,
+                    width: `${digitWidth - 8}`,
+                    height: "40",
+                    fill:
+                        currentBit === 1
+                            ? "#81c784"
+                            : "#ef9a9a",
+                    stroke: "black",
+                    "stroke-width": "2",
+                },
+            );
+
+            const bitText = createSvgElement(
+                svg.namespaceURI,
+                "text",
+                {
+                    class: "game-element",
+                    x: `${
+                        index * digitWidth + digitWidth / 2
+                    }`,
+                    y: `${Viewport.CANVAS_HEIGHT - 22}`,
+                    "text-anchor": "middle",
+                    "font-family": "monospace",
+                    "font-size": "20",
+                    fill: "black",
+                },
+            );
+
             bitText.textContent = String(currentBit);
+
             svg.appendChild(bitRectangle);
             svg.appendChild(bitText);
         });
+
+        /**
+         * Display the existing game-over group from index.html only
+         * when state.gameEnd is true.
+         */
+        if (s.gameEnd) {
+            show(gameOver);
+        } else {
+            hide(gameOver);
+        }
     };
 };
 
