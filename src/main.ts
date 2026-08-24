@@ -60,14 +60,14 @@ const Constants = {
 */
 const TARGET_SEQUENCE = [0x0d, 0x2a, 0x07, 0x35, 0x7f] as const;
 
-type Bit = 0 | 1; //bit can be 0 or 1
-type BinaryDigits = readonly [Bit, Bit, Bit, Bit, Bit, Bit, Bit, Bit]; //this is a immutable tuple containing 8 digits, the player's binary number contains exactly eight bits
+export type Bit = 0 | 1; //bit can be 0 or 1
+export type BinaryDigits = readonly [Bit, Bit, Bit, Bit, Bit, Bit, Bit, Bit]; //this is a immutable tuple containing 8 digits, the player's binary number contains exactly eight bits
 
 
 /*
 We also need to define any falling target
  */
-type FallingTarget = Readonly<{
+export type FallingTarget = Readonly<{
     // a unique number used to identify and remove this target
     id: number;
 
@@ -83,7 +83,7 @@ type FallingTarget = Readonly<{
 state contains all the info needed to describe the game
 */
 // State processing
-type State = Readonly<{
+export type State = Readonly<{
     //state holds the games current information
     binaryDigits: BinaryDigits;
     targets: ReadonlyArray<FallingTarget>;  //every target currently falling on the screen
@@ -91,25 +91,25 @@ type State = Readonly<{
 }>;
 
 
-type GameEvent = //events describe things that can change the game state
+export type GameEvent = //events describe things that can change the game state
     | Readonly<{ type: "Tick" }>  //tick represents time passing
     | Readonly<{ type: "FlipBinaryDigit"; index: number }>  //flipbinarydigit represents a number key being pressed
     | Readonly<{ type: "SpawnTarget"; target: FallingTarget;}>;
 
     // The game begins with all 8 binary digits being 0.
-const initialState: State = {
+export const initialState: State = {
     binaryDigits: [0, 0, 0, 0, 0, 0, 0, 0],
     targets: [],
     gameEnd: false,
 };
 
-const flipBit = (bit: Bit): Bit => (bit === 0 ? 1 : 0);  //this converts 0 to 1 pr 1 to 0
+export const flipBit = (bit: Bit): Bit => (bit === 0 ? 1 : 0);  //this converts 0 to 1 pr 1 to 0
 
 /*
 this part returns a new set of binary digits with one selected digit that would be flipped
 and the original binary digits are not modified.
 */
-const flipBinaryDigit = (
+export const flipBinaryDigit = (
     binaryDigits: BinaryDigits,
     selectedIndex: number,
 ): BinaryDigits =>
@@ -127,7 +127,7 @@ const flipBinaryDigit = (
  * Example:
  * 00001101 becomes decimal 13.
  */
-const binaryToDecimal = (binaryDigits: BinaryDigits): number =>
+export const binaryToDecimal = (binaryDigits: BinaryDigits): number =>
     binaryDigits.reduce<number>(
         (currentValue, bit) => currentValue * 2 + bit,
         0,
@@ -156,7 +156,7 @@ const createTarget = (
  * A larger y-coordinate means that a target is lower on the grid
  * The function returns undefined when there is no target
  */
-const getLowestTarget = (
+export const getLowestTarget = (
     targets: ReadonlyArray<FallingTarget>,
 ): FallingTarget | undefined =>
     targets.reduce<FallingTarget | undefined>(
@@ -177,7 +177,7 @@ const getLowestTarget = (
  * 3. finds the lowest target;
  * 4. checks it when it reaches the check line.
  */
-const tick = (state: State): State => {
+export const tick = (state: State): State => {
     // A finished game should no longer move or create targets.
     if (state.gameEnd) {
         return state;
@@ -247,7 +247,7 @@ const tick = (state: State): State => {
 /**
  * Produces the next state from the current state and an event.
  */
-const reduceState = (
+export const reduceState = (
     state: State,
     event: GameEvent,
 ): State => {
