@@ -512,6 +512,7 @@ const render = (): ((s: State) => void) => {
                 "rect",
                 {
                     class: "game-element",
+                    "data-digit-index": String(index),  //this stores which binary digit the rectangel boxes represent
                     x: `${index * digitWidth + 4}`,
                     y: `${Viewport.CANVAS_HEIGHT - 50}`,
                     width: `${digitWidth - 8}`,
@@ -530,6 +531,7 @@ const render = (): ((s: State) => void) => {
                 "text",
                 {
                     class: "game-element",
+                    "data-digit-index": String(index),
                     x: `${
                         index * digitWidth + digitWidth / 2
                     }`,
@@ -559,7 +561,30 @@ const render = (): ((s: State) => void) => {
     };
 };
 
+
+/**
+ Finds the binary digit associated with a mouse click.
+
+ The event target may be the rectangle or its text. closest finds
+ the nearest element containing a data-digit-index attribute
+ */
+const getClickedDigitElement = (
+    event: MouseEvent,
+): Element | null =>
+    event.target instanceof Element
+        ? event.target.closest("[data-digit-index]")
+        : null;
+
+
 export const state$ = (): Observable<State> => {
+    const svg = document.querySelector(
+        "#svgCanvas",
+    ) as SVGSVGElement;
+
+    const restartButton = document.querySelector(
+        "#restartButton",
+    ) as HTMLButtonElement;
+
     const tick$ = interval(Constants.TICK_RATE_MS).pipe(
         map((): GameEvent => ({ type: "Tick" })),
     );
@@ -618,9 +643,55 @@ const spawnTarget$ = targetId$.pipe(
         ),
     );
 
-    return merge(tick$, spawnTarget$, digitKey$).pipe(
-        scan(reduceState, initialState),
-        startWith(initialState),
+    /**
+     * Convert clicks on binary digits into FlipBinaryDigit events.
+     * One listener on the SVG handles both rectangles and their text.
+     */
+    const digitClick$ = fromEvent<MouseEvent>(svg, "click").pipe(
+        map(getClickedDigitElement),
+        filter(
+            (element): element is Element =>
+                element !== null,
+        ),
+        map(element =>
+            Number(
+                element.getAttribute("data-digit-index"),
+            ),
+        ),
+        filter(
+            index =>
+                Number.isInteger(index) &&
+                index >= 0 &&
+                index < Constants.DIGIT_COUNT,
+        ),
+        map(
+            (index): GameEvent => ({
+                type: "FlipBinaryDigit",
+                index,
+            }),
+        ),
+    );
+
+    /**
+     * Each restart cancels the active game streams and subscribes to
+     * fresh timers, input streams, and immutable state accumulation.
+     */
+    const restart$ = fromEvent(restartButton, "click");
+
+    return restart$.pipe(
+        // Start one game immediately, before the first restart click.
+        startWith(null),
+        switchMap(() =>
+            merge(
+                tick$,
+                spawnTarget$,
+                digitKey$,
+                digitClick$,
+            ).pipe(
+                scan(reduceState, initialState),
+                startWith(initialState),
+            ),
+        ),
     );
 };  //scan remembers the previous state and uses the reducer to calculate the next one
 
@@ -630,14 +701,5 @@ if (typeof window !== "undefined") {
     // Observable: wait for first user click
     const click$ = fromEvent(document.body, "mousedown").pipe(take(1));
 
-    const restartButton = document.querySelector(
-        "#restartButton",
-    ) as HTMLButtonElement;
-
-    // switchMap cancels the old timers and starts a fresh game stream
-    const restart$ = fromEvent(restartButton, "click");
-
-    merge(click$, restart$)
-        .pipe(switchMap(() => state$()))
-        .subscribe(render());
+    click$.pipe(switchMap(() => state$())).subscribe(render());
 }

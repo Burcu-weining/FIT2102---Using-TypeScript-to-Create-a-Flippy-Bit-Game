@@ -106,3 +106,12 @@ svg rect {
     font-weight: bolder;
     text-align: center;
 }
+
+/*
+ Show that the binary digits are interactive
+ Both the rectangle and text contain this data attribute.
+ This doesn't control the game, it gives visual feedback that the digits can be clicked
+ */
+ [data-digit-index] {
+    cursor: pointer;
+}
