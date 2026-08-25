@@ -11,6 +11,7 @@ import {
     initialState,
     reduceState,
     tick,
+    randomInteger,
 } from "../src/main";
 
 /**
@@ -186,5 +187,23 @@ describe("target movement", () => {
         const result = tick(state);
 
         expect(result.gameEnd).toBe(true);
+    });
+});
+
+describe("random integer generation", () => {
+    it("can produce the minimum value", () => {
+        const alwaysMinimum = (): number => 0;
+
+        expect(
+            randomInteger(1000, 3000, alwaysMinimum),
+        ).toBe(1000);
+    });
+
+    it("can produce the maximum value", () => {
+        const almostOne = (): number => 0.999999;
+
+        expect(
+            randomInteger(1000, 3000, almostOne),
+        ).toBe(3000);
     });
 });

@@ -25,6 +25,9 @@ import {
     scan,
     switchMap,
     take,
+    defer,  //creates new random sequence whenever the game starts
+    expand,  //schedules the next target after the previous target is emitted
+    timer,  //waits once for a specified duration
 } from "rxjs";
 
 /** Constants
@@ -45,20 +48,14 @@ const Constants = {
     DIGIT_COUNT: 8,
     TICK_RATE_MS: 100, // this updates the state 10 times per second
     TARGET_SPEED: 2, // this moves each target two SVG units on every tick
+    //full game targets use random delays from 1-3 secs
+    MIN_TARGET_SPAWN_MS: 1000,
+    MAX_TARGET_SPAWN_MS: 3000,
+    MAX_TARGET_VALUE: 0xff,  //hexadecimal for 235
     TARGET_SPAWN_MS: 2000, // creates a new target every 2 seconds
     CHECK_LINE_Y: 300, // targets are checked at this horizontal line
 } as const;
 
-
-/*
- * The minimum game may use a predefined sequence.
- *
- * The 0x prefix tells the code that these values are hexadecimal:
- * 0x0d = decimal 13
- * 0x2a = decimal 42
- * 0x7f = decimal 127
-*/
-const TARGET_SEQUENCE = [0x0d, 0x2a, 0x07, 0x35, 0x7f] as const;
 
 export type Bit = 0 | 1; //bit can be 0 or 1
 export type BinaryDigits = readonly [Bit, Bit, Bit, Bit, Bit, Bit, Bit, Bit]; //this is a immutable tuple containing 8 digits, the player's binary number contains exactly eight bits
@@ -133,6 +130,35 @@ export const binaryToDecimal = (binaryDigits: BinaryDigits): number =>
         0,
     );
 
+/**
+ A function capable of producing a number from 0, but not
+ including, 1. Math.random is the main funcitno doing this
+ */
+type RandomSource = () => number;
+
+/**
+ Produces an integer between min and max, including both endpoints
+ A random source can be supplied during tests. The real game uses
+ math.random by default.
+ */
+export const randomInteger = (
+    min: number,
+    max: number,
+    randomSource: RandomSource = Math.random,
+): number =>
+    Math.floor(
+        randomSource() * (max - min + 1),
+    ) + min;
+
+/*
+ Selects the delay before the next target appears.
+ Randomness is used by the Observable layer, not by the reducer
+ */
+const randomTargetDelay = (): number =>
+    randomInteger(
+        Constants.MIN_TARGET_SPAWN_MS,
+        Constants.MAX_TARGET_SPAWN_MS,
+    );
 
 /**
  * Creates one target using the predefined hexadecimal sequence
@@ -501,22 +527,38 @@ export const state$ = (): Observable<State> => {
         map((): GameEvent => ({ type: "Tick" })),
     );
 
-  /**
-     * Target-creation stream.
-     *
-     * interval emits increasing numbers:
-     * 0, 1, 2, 3, ...
-     *
-     * We use each emitted number as the target's unique ID.
-     */
-  const spawnTarget$ = interval(
-    Constants.TARGET_SPAWN_MS,
-).pipe(
+ /**
+ * Create an increasing sequence of target IDs.
+ *
+ * The first timer waits for a random delay and emits 0.
+ * expand then schedules ID 1 after another random delay,
+ * followed by ID 2, and so on.
+ */
+const targetId$ = defer(() =>
+    timer(randomTargetDelay()).pipe(
+        expand(id =>
+            timer(randomTargetDelay()).pipe(
+                map(() => id + 1),
+            ),
+        ),
+    ),
+);
+
+/**
+ Turn each emitted ID into a SpawnTarget event.
+ 
+ Random values are generated here, outside the reducer. The event
+ contains all the information needed for a deterministic update.
+  
+ The resulting SpawnTarget event already contains the target’s ID and value,
+ allowing reduceState to remain pure and predictable.
+ */
+const spawnTarget$ = targetId$.pipe(
     map((id): GameEvent => {
-        const hexadecimalValue =
-            TARGET_SEQUENCE[
-                id % TARGET_SEQUENCE.length
-            ];
+        const hexadecimalValue = randomInteger(
+            0,
+            Constants.MAX_TARGET_VALUE,
+        );
 
         return {
             type: "SpawnTarget",
