@@ -84,6 +84,7 @@ export type State = Readonly<{
     //state holds the games current information
     binaryDigits: BinaryDigits;
     targets: ReadonlyArray<FallingTarget>;  //every target currently falling on the screen
+    score: number;  //the score afftects what happens on the screen, so it belongs to the game state
     gameEnd: boolean;
 }>;
 
@@ -97,6 +98,7 @@ export type GameEvent = //events describe things that can change the game state
 export const initialState: State = {
     binaryDigits: [0, 0, 0, 0, 0, 0, 0, 0],
     targets: [],
+    score: 0,  //every new game begins with 0
     gameEnd: false,
 };
 
@@ -252,6 +254,7 @@ export const tick = (state: State): State => {
             targets: movedTargets.filter(
                 target => target.id !== lowestTarget.id,
             ),
+            score: state.score + 1, //awards one point if correct
         };
     }
 
@@ -363,6 +366,11 @@ const render = (): ((s: State) => void) => {
         "#gameOver",
     ) as SVGElement;
 
+    const scoreText = document.querySelector(
+        "#scoreText",
+    ) as HTMLElement;
+    
+
     svg.setAttribute(
         "viewBox",
         `0 0 ${Viewport.CANVAS_WIDTH} ${Viewport.CANVAS_HEIGHT}`,
@@ -375,6 +383,7 @@ const render = (): ((s: State) => void) => {
      * SVG is a side effect, so it belongs in the rendering section.
      */
     return (s: State): void => {
+        scoreText.textContent = String(s.score);
         /**
          * Remove the elements created by the previous render.
          *

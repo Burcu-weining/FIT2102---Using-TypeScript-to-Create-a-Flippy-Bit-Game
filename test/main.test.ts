@@ -171,6 +171,7 @@ describe("target movement", () => {
 
         expect(result.targets).toEqual([]);
         expect(result.gameEnd).toBe(false);
+        expect(result.score).toBe(1);
     });
 
     it("ends the game when the answer is incorrect", () => {
@@ -206,4 +207,28 @@ describe("random integer generation", () => {
             randomInteger(1000, 3000, almostOne),
         ).toBe(3000);
     });
+});
+
+it("adds one point to the existing score", () => {
+    const binaryThirteen: BinaryDigits = [
+        0, 0, 0, 0, 1, 1, 0, 1,
+    ];
+
+    const state = createTestState({
+        binaryDigits: binaryThirteen,
+        score: 4,
+        targets: [
+            {
+                id: 0,
+                hexadecimalValue: 13,
+
+                // After moving by 2, the target reaches the line.
+                y: 262,
+            },
+        ],
+    });
+
+    const result = tick(state);
+
+    expect(result.score).toBe(5);
 });
