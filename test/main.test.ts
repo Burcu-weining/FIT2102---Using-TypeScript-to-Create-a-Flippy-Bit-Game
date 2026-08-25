@@ -12,6 +12,7 @@ import {
     reduceState,
     tick,
     randomInteger,
+    targetSpeed,
 } from "../src/main";
 
 /**
@@ -145,7 +146,7 @@ describe("target movement", () => {
 
         const result = tick(state);
 
-        expect(result.targets[0].y).toBe(102);
+        expect(result.targets[0].y).toBe(104);
         expect(state.targets[0].y).toBe(100);
     });
 
@@ -161,8 +162,8 @@ describe("target movement", () => {
                     id: 0,
                     hexadecimalValue: 13,
 
-                    // After moving by 2, its bottom reaches y = 300.
-                    y: 262,
+                    // At the starting speed, its bottom reaches 300.
+                    y: 260,
                 },
             ],
         });
@@ -180,7 +181,7 @@ describe("target movement", () => {
                 {
                     id: 0,
                     hexadecimalValue: 13,
-                    y: 262,
+                    y: 260,
                 },
             ],
         });
@@ -222,8 +223,8 @@ it("adds one point to the existing score", () => {
                 id: 0,
                 hexadecimalValue: 13,
 
-                // After moving by 2, the target reaches the line.
-                y: 262,
+                // At the starting speed, its bottom reaches 300.
+                y: 260,
             },
         ],
     });
@@ -231,4 +232,22 @@ it("adds one point to the existing score", () => {
     const result = tick(state);
 
     expect(result.score).toBe(5);
+});
+
+describe("target speed", () => {
+    it("starts at the slowest speed", () => {
+        expect(targetSpeed(0)).toBe(4);
+    });
+
+    it("increases gradually with survival time", () => {
+        expect(targetSpeed(600)).toBe(7);
+    });
+
+    it("reaches the maximum speed after two minutes", () => {
+        expect(targetSpeed(1200)).toBe(10);
+    });
+
+    it("does not exceed the maximum speed", () => {
+        expect(targetSpeed(2400)).toBe(10);
+    });
 });

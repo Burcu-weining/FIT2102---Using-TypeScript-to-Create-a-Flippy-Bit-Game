@@ -84,6 +84,13 @@ svg rect {
     font-weight: bold;
 }
 
+#restartButton {
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: bold;
+    padding: 0.6em;
+}
+
 .left {
     font-size: 1.1em;
     float: left;

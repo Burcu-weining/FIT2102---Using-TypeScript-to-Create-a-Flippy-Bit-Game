@@ -23,6 +23,7 @@ import {
     map,
     merge, //merge combines multiple observables.
     scan,
+    startWith,
     switchMap,
     take,
     defer,  //creates new random sequence whenever the game starts
@@ -47,12 +48,14 @@ const Target = {
 const Constants = {
     DIGIT_COUNT: 8,
     TICK_RATE_MS: 100, // this updates the state 10 times per second
-    TARGET_SPEED: 2, // this moves each target two SVG units on every tick
+    // Start slowly, then increase smoothly as survival time grows.
+    STARTING_TARGET_SPEED: 4,
+    MAX_TARGET_SPEED: 10,
+    TICKS_TO_MAX_SPEED: 1200,
     //full game targets use random delays from 1-3 secs
     MIN_TARGET_SPAWN_MS: 1000,
     MAX_TARGET_SPAWN_MS: 3000,
     MAX_TARGET_VALUE: 0xff,  //hexadecimal for 235
-    TARGET_SPAWN_MS: 2000, // creates a new target every 2 seconds
     CHECK_LINE_Y: 300, // targets are checked at this horizontal line
 } as const;
 
@@ -85,6 +88,7 @@ export type State = Readonly<{
     binaryDigits: BinaryDigits;
     targets: ReadonlyArray<FallingTarget>;  //every target currently falling on the screen
     score: number;  //the score afftects what happens on the screen, so it belongs to the game state
+    elapsedTicks: number;
     gameEnd: boolean;
 }>;
 
@@ -99,6 +103,7 @@ export const initialState: State = {
     binaryDigits: [0, 0, 0, 0, 0, 0, 0, 0],
     targets: [],
     score: 0,  //every new game begins with 0
+    elapsedTicks: 0,
     gameEnd: false,
 };
 
@@ -197,6 +202,22 @@ export const getLowestTarget = (
     );
 
 /**
+ * Calculates target speed from survival time.
+ *
+ * The speed rises smoothly from 4 to 10 over two minutes and is
+ * capped so the game remains playable.
+ */
+export const targetSpeed = (elapsedTicks: number): number =>
+    Math.min(
+        Constants.STARTING_TARGET_SPEED +
+            (Constants.MAX_TARGET_SPEED -
+                Constants.STARTING_TARGET_SPEED) *
+                (elapsedTicks /
+                    Constants.TICKS_TO_MAX_SPEED),
+        Constants.MAX_TARGET_SPEED,
+    );
+
+/**
  * Moves the game forward by one time step.
  *
  * This function:
@@ -213,6 +234,9 @@ export const tick = (state: State): State => {
 
 
 
+    const nextElapsedTicks = state.elapsedTicks + 1;
+    const currentTargetSpeed = targetSpeed(state.elapsedTicks);
+
     /**
      * Create a new array containing moved targets.
      *
@@ -220,7 +244,7 @@ export const tick = (state: State): State => {
      */
     const movedTargets = state.targets.map(target => ({
         ...target,
-        y: target.y + Constants.TARGET_SPEED,
+        y: target.y + currentTargetSpeed,
     }));
 
     const lowestTarget = getLowestTarget(movedTargets);
@@ -229,6 +253,7 @@ export const tick = (state: State): State => {
         return {
             ...state,
             targets: movedTargets,
+            elapsedTicks: nextElapsedTicks,
         };
     }
 
@@ -240,6 +265,7 @@ export const tick = (state: State): State => {
         return {
             ...state,
             targets: movedTargets,
+            elapsedTicks: nextElapsedTicks,
         };
     }
 
@@ -255,12 +281,14 @@ export const tick = (state: State): State => {
                 target => target.id !== lowestTarget.id,
             ),
             score: state.score + 1, //awards one point if correct
+            elapsedTicks: nextElapsedTicks,
         };
     }
 
     return {
         ...state,
         targets: movedTargets,
+        elapsedTicks: nextElapsedTicks,
         gameEnd: true,
     };
 };
@@ -590,7 +618,10 @@ const spawnTarget$ = targetId$.pipe(
         ),
     );
 
-    return merge(tick$, spawnTarget$, digitKey$).pipe(scan(reduceState, initialState));  //this combines the timer events and keyboard events
+    return merge(tick$, spawnTarget$, digitKey$).pipe(
+        scan(reduceState, initialState),
+        startWith(initialState),
+    );
 };  //scan remembers the previous state and uses the reducer to calculate the next one
 
 // The following simply runs your main function on window load.  Make sure to leave it in place.
@@ -599,5 +630,14 @@ if (typeof window !== "undefined") {
     // Observable: wait for first user click
     const click$ = fromEvent(document.body, "mousedown").pipe(take(1));
 
-    click$.pipe(switchMap(() => state$())).subscribe(render());
+    const restartButton = document.querySelector(
+        "#restartButton",
+    ) as HTMLButtonElement;
+
+    // switchMap cancels the old timers and starts a fresh game stream
+    const restart$ = fromEvent(restartButton, "click");
+
+    merge(click$, restart$)
+        .pipe(switchMap(() => state$()))
+        .subscribe(render());
 }
