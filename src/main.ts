@@ -385,7 +385,23 @@ const createSvgElement = (
     return elem;
 };
 
-const render = (): ((s: State) => void) => {
+/*
+ * SVG elements to display one falling target
+ */
+type TargetElements = Readonly<{
+    rectangle: SVGElement;
+    text: SVGElement;
+}>;
+
+/*
+ SVG elements used to display one player controlled binary digit.
+ */
+type BinaryDigitElements = Readonly<{
+    rectangle: SVGElement;
+    text: SVGElement;
+}>;
+
+const render = (): ((state: State) => void) => {
     const svg = document.querySelector(
         "#svgCanvas",
     ) as SVGSVGElement;
@@ -397,7 +413,6 @@ const render = (): ((s: State) => void) => {
     const scoreText = document.querySelector(
         "#scoreText",
     ) as HTMLElement;
-    
 
     svg.setAttribute(
         "viewBox",
@@ -405,155 +420,176 @@ const render = (): ((s: State) => void) => {
     );
 
     /**
-     * Renders the current state to the canvas.
-     *
-     * State processing is kept outside this function. Updating the
-     * SVG is a side effect, so it belongs in the rendering section.
+     * Static elements are created once because their structure and
+     * position do not change between state emissions.
      */
-    return (s: State): void => {
-        scoreText.textContent = String(s.score);
-        /**
-         * Remove the elements created by the previous render.
-         *
-         * The game-over group from index.html is not removed because
-         * it does not have the "game-element" class.
-         */
-        svg.querySelectorAll(".game-element").forEach(element => {
-            element.remove();
-        });
+    const checkLine = createSvgElement(
+        svg.namespaceURI,
+        "line",
+        {
+            x1: "0",
+            y1: `${Constants.CHECK_LINE_Y}`,
+            x2: `${Viewport.CANVAS_WIDTH}`,
+            y2: `${Constants.CHECK_LINE_Y}`,
+            stroke: "yellow",
+            "stroke-width": "3",
+            "stroke-dasharray": "8 5",
+        },
+    );
 
-        /**
-         * Draw the horizontal line where targets are checked.
-         */
-        const checkLine = createSvgElement(
-            svg.namespaceURI,
-            "line",
-            {
-                class: "game-element",
-                x1: "0",
-                y1: `${Constants.CHECK_LINE_Y}`,
-                x2: `${Viewport.CANVAS_WIDTH}`,
-                y2: `${Constants.CHECK_LINE_Y}`,
-                stroke: "yellow",
-                "stroke-width": "3",
-                "stroke-dasharray": "8 5",
+    const targetLayer = createSvgElement(
+        svg.namespaceURI,
+        "g",
+        { id: "targetLayer" },
+    );
+
+    svg.appendChild(checkLine);
+    svg.appendChild(targetLayer);
+
+    const digitWidth =
+        Viewport.CANVAS_WIDTH / Constants.DIGIT_COUNT;
+
+    const binaryDigitElements: ReadonlyArray<BinaryDigitElements> =
+        Array.from(
+            { length: Constants.DIGIT_COUNT },
+            (_, index) => {
+                const rectangle = createSvgElement(
+                    svg.namespaceURI,
+                    "rect",
+                    {
+                        "data-digit-index": String(index),
+                        x: `${index * digitWidth + 4}`,
+                        y: `${Viewport.CANVAS_HEIGHT - 50}`,
+                        width: `${digitWidth - 8}`,
+                        height: "40",
+                        fill: "#ef9a9a",
+                        stroke: "black",
+                        "stroke-width": "2",
+                    },
+                );
+
+                const text = createSvgElement(
+                    svg.namespaceURI,
+                    "text",
+                    {
+                        "data-digit-index": String(index),
+                        x: `${
+                            index * digitWidth +
+                            digitWidth / 2
+                        }`,
+                        y: `${Viewport.CANVAS_HEIGHT - 22}`,
+                        "text-anchor": "middle",
+                        "font-family": "monospace",
+                        "font-size": "20",
+                        fill: "black",
+                    },
+                );
+
+                text.textContent = "0";
+                svg.appendChild(rectangle);
+                svg.appendChild(text);
+
+                return { rectangle, text };
             },
         );
 
-        svg.appendChild(checkLine);
+    /**
+     This mutable map is rendering-only. Functional game
+     state remains immutable and contains no DOM elements.
+     */
+    const targetElements = new Map<number, TargetElements>();
 
-        /**
-         * Draw every target currently stored in state.
-         */
-        s.targets.forEach(target => {
-            const targetX =
-                Viewport.CANVAS_WIDTH / 2 -
-                Target.WIDTH / 2;
+    const createTargetElements = (
+        target: FallingTarget,
+    ): TargetElements => {
+        const targetX =
+            Viewport.CANVAS_WIDTH / 2 -
+            Target.WIDTH / 2;
 
-            const targetRectangle = createSvgElement(
-                svg.namespaceURI,
-                "rect",
-                {
-                    class: "game-element",
-                    x: `${targetX}`,
-                    y: `${target.y}`,
-                    width: `${Target.WIDTH}`,
-                    height: `${Target.HEIGHT}`,
-                    rx: "6",
-                    fill: "white",
-                    stroke: "black",
-                    "stroke-width": "2",
-                },
+        const rectangle = createSvgElement(
+            svg.namespaceURI,
+            "rect",
+            {
+                x: `${targetX}`,
+                y: `${target.y}`,
+                width: `${Target.WIDTH}`,
+                height: `${Target.HEIGHT}`,
+                rx: "6",
+                fill: "white",
+                stroke: "black",
+                "stroke-width": "2",
+            },
+        );
+
+        const text = createSvgElement(
+            svg.namespaceURI,
+            "text",
+            {
+                x: `${Viewport.CANVAS_WIDTH / 2}`,
+                y: `${target.y + Target.HEIGHT / 2 + 7}`,
+                "text-anchor": "middle",
+                "font-family": "monospace",
+                "font-size": "20",
+                fill: "black",
+            },
+        );
+
+        text.textContent = target.hexadecimalValue
+            .toString(16)
+            .toUpperCase();
+
+        targetLayer.appendChild(rectangle);
+        targetLayer.appendChild(text);
+
+        return { rectangle, text };
+    };
+
+    return (state: State): void => {
+        scoreText.textContent = String(state.score);
+
+        binaryDigitElements.forEach(
+            ({ rectangle, text }, index) => {
+                const currentBit = state.binaryDigits[index];
+
+                rectangle.setAttribute(
+                    "fill",
+                    currentBit === 1
+                        ? "#81c784"
+                        : "#ef9a9a",
+                );
+                text.textContent = String(currentBit);
+            },
+        );
+
+        const activeTargetIds = new Set(
+            state.targets.map(target => target.id),
+        );
+
+        state.targets.forEach(target => {
+            const existingElements = targetElements.get(target.id);
+            const elements =
+                existingElements ?? createTargetElements(target);
+
+            if (existingElements === undefined) {
+                targetElements.set(target.id, elements);
+            }
+
+            elements.rectangle.setAttribute("y", String(target.y));
+            elements.text.setAttribute(
+                "y",
+                String(target.y + Target.HEIGHT / 2 + 7),
             );
-
-            const targetText = createSvgElement(
-                svg.namespaceURI,
-                "text",
-                {
-                    class: "game-element",
-                    x: `${Viewport.CANVAS_WIDTH / 2}`,
-                    y: `${target.y + Target.HEIGHT / 2 + 7}`,
-                    "text-anchor": "middle",
-                    "font-family": "monospace",
-                    "font-size": "20",
-                    fill: "black",
-                },
-            );
-
-            /**
-             * Display the value using hexadecimal characters.
-             *
-             * For example:
-             * decimal 13 becomes "D"
-             * decimal 42 becomes "2A"
-             */
-            targetText.textContent =
-                target.hexadecimalValue
-                    .toString(16)
-                    .toUpperCase();
-
-            svg.appendChild(targetRectangle);
-            svg.appendChild(targetText);
         });
 
-        /**
-         * Draw the player's eight binary digits.
-         */
-        const digitWidth =
-            Viewport.CANVAS_WIDTH / Constants.DIGIT_COUNT;
-
-        Array.from({
-            length: Constants.DIGIT_COUNT,
-        }).forEach((_, index) => {
-            const currentBit = s.binaryDigits[index];
-
-            const bitRectangle = createSvgElement(
-                svg.namespaceURI,
-                "rect",
-                {
-                    class: "game-element",
-                    "data-digit-index": String(index),  //this stores which binary digit the rectangel boxes represent
-                    x: `${index * digitWidth + 4}`,
-                    y: `${Viewport.CANVAS_HEIGHT - 50}`,
-                    width: `${digitWidth - 8}`,
-                    height: "40",
-                    fill:
-                        currentBit === 1
-                            ? "#81c784"
-                            : "#ef9a9a",
-                    stroke: "black",
-                    "stroke-width": "2",
-                },
-            );
-
-            const bitText = createSvgElement(
-                svg.namespaceURI,
-                "text",
-                {
-                    class: "game-element",
-                    "data-digit-index": String(index),
-                    x: `${
-                        index * digitWidth + digitWidth / 2
-                    }`,
-                    y: `${Viewport.CANVAS_HEIGHT - 22}`,
-                    "text-anchor": "middle",
-                    "font-family": "monospace",
-                    "font-size": "20",
-                    fill: "black",
-                },
-            );
-
-            bitText.textContent = String(currentBit);
-
-            svg.appendChild(bitRectangle);
-            svg.appendChild(bitText);
+        targetElements.forEach((elements, id) => {
+            if (!activeTargetIds.has(id)) {
+                elements.rectangle.remove();
+                elements.text.remove();
+                targetElements.delete(id);
+            }
         });
 
-        /**
-         * Display the existing game-over group from index.html only
-         * when state.gameEnd is true.
-         */
-        if (s.gameEnd) {
+        if (state.gameEnd) {
             show(gameOver);
         } else {
             hide(gameOver);
@@ -590,11 +626,11 @@ export const state$ = (): Observable<State> => {
     );
 
  /**
- * Create an increasing sequence of target IDs.
- *
- * The first timer waits for a random delay and emits 0.
- * expand then schedules ID 1 after another random delay,
- * followed by ID 2, and so on.
+ Create an increasing sequence of target ID
+ 
+ The first timer waits for a random delay and emits 0.
+ expand then schedules ID 1 after another random delay,
+ followed by ID 2, and so on.
  */
 const targetId$ = defer(() =>
     timer(randomTargetDelay()).pipe(
@@ -672,9 +708,9 @@ const spawnTarget$ = targetId$.pipe(
         ),
     );
 
-    /**
-     * Each restart cancels the active game streams and subscribes to
-     * fresh timers, input streams, and immutable state accumulation.
+    /*
+     Each restart cancels the active game streams and subscribes to
+     fresh timers, input streams, and immutable state accumulation
      */
     const restart$ = fromEvent(restartButton, "click");
 
