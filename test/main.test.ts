@@ -251,3 +251,72 @@ describe("target speed", () => {
         expect(targetSpeed(2400)).toBe(10);
     });
 });
+
+describe("challenges", () => {
+    const binaryThirteen: BinaryDigits = [
+        0, 0, 0, 0, 1, 1, 0, 1,
+    ];
+
+    const targetThirteen: FallingTarget = {
+        id: 0,
+        hexadecimalValue: 13,
+        y: 260,
+    };
+
+    it("awards a trophy after reaching score 10", () => {
+        const result = tick(
+            createTestState({
+                binaryDigits: binaryThirteen,
+                targets: [targetThirteen],
+                score: 9,
+            }),
+        );
+
+        expect(result.completedChallenges).toContain("scoreTen");
+    });
+
+    it("awards a trophy for five matches in 15 seconds", () => {
+        const result = tick(
+            createTestState({
+                binaryDigits: binaryThirteen,
+                targets: [targetThirteen],
+                elapsedTicks: 100,
+                fastTargetsSolved: 4,
+            }),
+        );
+
+        expect(result.completedChallenges).toContain(
+            "fiveInFifteen",
+        );
+    });
+
+    it("does not count fast matches after 15 seconds", () => {
+        const result = tick(
+            createTestState({
+                binaryDigits: binaryThirteen,
+                targets: [targetThirteen],
+                elapsedTicks: 151,
+                fastTargetsSolved: 4,
+            }),
+        );
+
+        expect(result.fastTargetsSolved).toBe(4);
+        expect(result.completedChallenges).not.toContain(
+            "fiveInFifteen",
+        );
+    });
+
+    it("awards a trophy after reaching score 20", () => {
+        const result = tick(
+            createTestState({
+                binaryDigits: binaryThirteen,
+                targets: [targetThirteen],
+                score: 19,
+            }),
+        );
+
+        expect(result.completedChallenges).toContain(
+            "scoreTwenty",
+        );
+    });
+});

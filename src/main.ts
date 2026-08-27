@@ -16,7 +16,6 @@ import "./style.css";
 
 import {
     Observable,
-    catchError,
     filter,
     fromEvent,
     interval,
@@ -31,9 +30,10 @@ import {
     timer,  //waits once for a specified duration
 } from "rxjs";
 
-/** Constants
- * These will control the sonstants throughout the game
+/*Constants:
+ * Values controlling the game dimensions, timing, and difficulty.
  */
+
 
 const Viewport = {
     CANVAS_WIDTH: 600,
@@ -55,14 +55,27 @@ const Constants = {
     //full game targets use random delays from 1-3 secs
     MIN_TARGET_SPAWN_MS: 1000,
     MAX_TARGET_SPAWN_MS: 3000,
-    MAX_TARGET_VALUE: 0xff,  //hexadecimal for 235
+    MAX_TARGET_VALUE: 0xff,  //hexadecimal for 255
     CHECK_LINE_Y: 300, // targets are checked at this horizontal line
+    CHALLENGE_TIME_LIMIT_TICKS: 150,
 } as const;
 
 
 export type Bit = 0 | 1; //bit can be 0 or 1
-export type BinaryDigits = readonly [Bit, Bit, Bit, Bit, Bit, Bit, Bit, Bit]; //this is a immutable tuple containing 8 digits, the player's binary number contains exactly eight bits
 
+/*
+ * The player's immutable eight-bit binary digit
+ */
+export type BinaryDigits = readonly [
+    Bit,
+    Bit,
+    Bit,
+    Bit,
+    Bit,
+    Bit,
+    Bit,
+    Bit,
+];
 
 /*
 We also need to define any falling target
@@ -78,17 +91,24 @@ export type FallingTarget = Readonly<{
     y: number;
 }>;
 
+export type ChallengeId =
+    | "scoreTen"
+    | "fiveInFifteen"
+    | "scoreTwenty";
+
 
 /*
 state contains all the info needed to describe the game
 */
-// State processing
 export type State = Readonly<{
     //state holds the games current information
     binaryDigits: BinaryDigits;
     targets: ReadonlyArray<FallingTarget>;  //every target currently falling on the screen
     score: number;  //the score afftects what happens on the screen, so it belongs to the game state
     elapsedTicks: number;
+    targetsSolved: number;
+    fastTargetsSolved: number;
+    completedChallenges: ReadonlyArray<ChallengeId>;
     gameEnd: boolean;
 }>;
 
@@ -98,16 +118,24 @@ export type GameEvent = //events describe things that can change the game state
     | Readonly<{ type: "FlipBinaryDigit"; index: number }>  //flipbinarydigit represents a number key being pressed
     | Readonly<{ type: "SpawnTarget"; target: FallingTarget;}>;
 
-    // The game begins with all 8 binary digits being 0.
+/*
+A new game starts with no targets, no score, and all bits off
+*/
 export const initialState: State = {
     binaryDigits: [0, 0, 0, 0, 0, 0, 0, 0],
     targets: [],
     score: 0,  //every new game begins with 0
     elapsedTicks: 0,
+    targetsSolved: 0,
+    fastTargetsSolved: 0,
+    completedChallenges: [],
     gameEnd: false,
 };
 
-export const flipBit = (bit: Bit): Bit => (bit === 0 ? 1 : 0);  //this converts 0 to 1 pr 1 to 0
+/*
+returns the opposite binary value
+*/
+export const flipBit = (bit: Bit): Bit => (bit === 0 ? 1 : 0);
 
 /*
 this part returns a new set of binary digits with one selected digit that would be flipped
@@ -217,6 +245,29 @@ export const targetSpeed = (elapsedTicks: number): number =>
         Constants.MAX_TARGET_SPEED,
     );
 
+/*
+ Adds every newly satisfied challenge without duplicating the trophies.
+ */
+export const updateCompletedChallenges = (
+    state: State,
+): ReadonlyArray<ChallengeId> => {
+    const challengeResults: ReadonlyArray<
+        readonly [ChallengeId, boolean]
+    > = [
+        ["scoreTen", state.score >= 10],
+        ["fiveInFifteen", state.fastTargetsSolved >= 5],
+        ["scoreTwenty", state.score >= 20 && !state.gameEnd],
+    ];
+
+    return challengeResults.reduce<ReadonlyArray<ChallengeId>>(
+        (completed, [challengeId, isComplete]) =>
+            isComplete && !completed.includes(challengeId)
+                ? [...completed, challengeId]
+                : completed,
+        state.completedChallenges,
+    );
+};
+
 /**
  * Moves the game forward by one time step.
  *
@@ -274,14 +325,28 @@ export const tick = (state: State): State => {
     const answerIsCorrect =
         playerValue === lowestTarget?.hexadecimalValue;
 
-    if (answerIsCorrect) {  //this resolves only the lowest target and the targets above it remains in the array
-        return {
+    if (answerIsCorrect) {
+        const matchedDuringChallenge =
+            nextElapsedTicks <=
+            Constants.CHALLENGE_TIME_LIMIT_TICKS;
+
+        const matchedState: State = {
             ...state,
             targets: movedTargets.filter(
                 target => target.id !== lowestTarget.id,
             ),
-            score: state.score + 1, //awards one point if correct
+            score: state.score + 1,
             elapsedTicks: nextElapsedTicks,
+            targetsSolved: state.targetsSolved + 1,
+            fastTargetsSolved:
+                state.fastTargetsSolved +
+                (matchedDuringChallenge ? 1 : 0),
+        };
+
+        return {
+            ...matchedState,
+            completedChallenges:
+                updateCompletedChallenges(matchedState),
         };
     }
 
@@ -413,6 +478,32 @@ const render = (): ((state: State) => void) => {
     const scoreText = document.querySelector(
         "#scoreText",
     ) as HTMLElement;
+
+    const challengeElements: ReadonlyArray<
+        Readonly<{
+            id: ChallengeId;
+            element: HTMLElement;
+        }>
+    > = [
+        {
+            id: "scoreTen",
+            element: document.querySelector(
+                "#challengeScoreTen",
+            ) as HTMLElement,
+        },
+        {
+            id: "fiveInFifteen",
+            element: document.querySelector(
+                "#challengeFastFive",
+            ) as HTMLElement,
+        },
+        {
+            id: "scoreTwenty",
+            element: document.querySelector(
+                "#challengeScoreTwenty",
+            ) as HTMLElement,
+        },
+    ];
 
     svg.setAttribute(
         "viewBox",
@@ -546,6 +637,17 @@ const render = (): ((state: State) => void) => {
 
     return (state: State): void => {
         scoreText.textContent = String(state.score);
+
+        challengeElements.forEach(({ id, element }) => {
+            const isComplete =
+                state.completedChallenges.includes(id);
+            const trophy = element.querySelector(
+                ".trophy",
+            ) as HTMLElement;
+
+            element.classList.toggle("completed", isComplete);
+            trophy.textContent = isComplete ? "🏆" : "○";
+        });
 
         binaryDigitElements.forEach(
             ({ rectangle, text }, index) => {

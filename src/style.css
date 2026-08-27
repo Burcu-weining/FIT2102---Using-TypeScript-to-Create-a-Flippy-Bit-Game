@@ -91,6 +91,35 @@ svg rect {
     padding: 0.6em;
 }
 
+#challenges h2 {
+    font-size: 1.1em;
+    margin-bottom: 0.5em;
+}
+
+#challenges ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+#challenges li {
+    font-size: 0.9em;
+    line-height: 1.3;
+}
+
+#challenges li.completed {
+    color: #1b6e2b;
+    font-weight: bold;
+}
+
+.trophy {
+    display: inline-block;
+    width: 1.5em;
+}
+
 .left {
     font-size: 1.1em;
     float: left;
