@@ -109,6 +109,7 @@ export type State = Readonly<{
     targetsSolved: number;
     fastTargetsSolved: number;
     completedChallenges: ReadonlyArray<ChallengeId>;
+    scoreHistory: ReadonlyArray<number>;
     gameEnd: boolean;
 }>;
 
@@ -116,7 +117,8 @@ export type State = Readonly<{
 export type GameEvent = //events describe things that can change the game state
     | Readonly<{ type: "Tick" }>  //tick represents time passing
     | Readonly<{ type: "FlipBinaryDigit"; index: number }>  //flipbinarydigit represents a number key being pressed
-    | Readonly<{ type: "SpawnTarget"; target: FallingTarget;}>;
+    | Readonly<{ type: "SpawnTarget"; target: FallingTarget;}>
+    | Readonly<{ type: "Restart" }>;
 
 /*
 A new game starts with no targets, no score, and all bits off
@@ -129,6 +131,7 @@ export const initialState: State = {
     targetsSolved: 0,
     fastTargetsSolved: 0,
     completedChallenges: [],
+    scoreHistory: [],
     gameEnd: false,
 };
 
@@ -357,6 +360,19 @@ export const tick = (state: State): State => {
         gameEnd: true,
     };
 };
+
+/**
+ * Creates a fresh game while retaining scores from earlier attempts.
+ * Scores live only in memory and disappear when the page is reloaded.
+ */
+export const restartGame = (state: State): State => ({
+    ...initialState,
+    scoreHistory:
+        state.elapsedTicks > 0
+            ? [...state.scoreHistory, state.score]
+            : state.scoreHistory,
+});
+
 /**
  * Produces the next state from the current state
  *
@@ -399,6 +415,9 @@ export const reduceState = (
 
         case "Tick":
             return tick(state);
+
+        case "Restart":
+            return restartGame(state);
     }
 };
 
@@ -477,6 +496,14 @@ const render = (): ((state: State) => void) => {
 
     const scoreText = document.querySelector(
         "#scoreText",
+    ) as HTMLElement;
+
+    const scoreHistoryList = document.querySelector(
+        "#scoreHistory",
+    ) as HTMLOListElement;
+
+    const emptyScoreHistory = document.querySelector(
+        "#emptyScoreHistory",
     ) as HTMLElement;
 
     const challengeElements: ReadonlyArray<
@@ -589,6 +616,7 @@ const render = (): ((state: State) => void) => {
      state remains immutable and contains no DOM elements.
      */
     const targetElements = new Map<number, TargetElements>();
+    let renderedScoreHistory: ReadonlyArray<number> | undefined;
 
     const createTargetElements = (
         target: FallingTarget,
@@ -637,6 +665,21 @@ const render = (): ((state: State) => void) => {
 
     return (state: State): void => {
         scoreText.textContent = String(state.score);
+
+        if (renderedScoreHistory !== state.scoreHistory) {
+            const historyItems = state.scoreHistory.map(
+                (score, index) => {
+                    const item = document.createElement("li");
+                    item.textContent = `Game ${index + 1}: ${score}`;
+                    return item;
+                },
+            );
+
+            scoreHistoryList.replaceChildren(...historyItems);
+            emptyScoreHistory.hidden =
+                state.scoreHistory.length > 0;
+            renderedScoreHistory = state.scoreHistory;
+        }
 
         challengeElements.forEach(({ id, element }) => {
             const isComplete =
@@ -810,26 +853,19 @@ const spawnTarget$ = targetId$.pipe(
         ),
     );
 
-    /*
-     Each restart cancels the active game streams and subscribes to
-     fresh timers, input streams, and immutable state accumulation
-     */
-    const restart$ = fromEvent(restartButton, "click");
+    const restart$ = fromEvent(restartButton, "click").pipe(
+        map((): GameEvent => ({ type: "Restart" })),
+    );
 
-    return restart$.pipe(
-        // Start one game immediately, before the first restart click.
-        startWith(null),
-        switchMap(() =>
-            merge(
-                tick$,
-                spawnTarget$,
-                digitKey$,
-                digitClick$,
-            ).pipe(
-                scan(reduceState, initialState),
-                startWith(initialState),
-            ),
-        ),
+    return merge(
+        tick$,
+        spawnTarget$,
+        digitKey$,
+        digitClick$,
+        restart$,
+    ).pipe(
+        scan(reduceState, initialState),
+        startWith(initialState),
     );
 };  //scan remembers the previous state and uses the reducer to calculate the next one
 

@@ -320,3 +320,55 @@ describe("challenges", () => {
         );
     });
 });
+
+describe("score history", () => {
+    it("records the score when a played game restarts", () => {
+        const result = reduceState(
+            createTestState({
+                score: 7,
+                elapsedTicks: 50,
+                binaryDigits: [
+                    1, 1, 1, 1, 1, 1, 1, 1,
+                ],
+                targets: [
+                    {
+                        id: 1,
+                        hexadecimalValue: 13,
+                        y: 100,
+                    },
+                ],
+            }),
+            { type: "Restart" },
+        );
+
+        expect(result.scoreHistory).toEqual([7]);
+        expect(result.score).toBe(0);
+        expect(result.targets).toEqual([]);
+        expect(result.binaryDigits).toEqual(
+            initialState.binaryDigits,
+        );
+        expect(result.elapsedTicks).toBe(0);
+    });
+
+    it("appends scores from multiple games", () => {
+        const result = reduceState(
+            createTestState({
+                score: 3,
+                elapsedTicks: 20,
+                scoreHistory: [7],
+            }),
+            { type: "Restart" },
+        );
+
+        expect(result.scoreHistory).toEqual([7, 3]);
+    });
+
+    it("does not record an unplayed game", () => {
+        const result = reduceState(
+            initialState,
+            { type: "Restart" },
+        );
+
+        expect(result.scoreHistory).toEqual([]);
+    });
+});

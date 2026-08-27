@@ -120,6 +120,28 @@ svg rect {
     width: 1.5em;
 }
 
+#scoreHistoryPanel h2 {
+    font-size: 1.1em;
+    margin-bottom: 0.5em;
+}
+
+#scoreHistoryPanel p {
+    font-size: 0.9em;
+    margin: 0;
+}
+
+#scoreHistory {
+    margin: 0;
+    max-height: 8em;
+    overflow-y: auto;
+    padding-left: 1.8em;
+}
+
+#scoreHistory li {
+    font-size: 0.9em;
+    margin-bottom: 0.3em;
+}
+
 .left {
     font-size: 1.1em;
     float: left;
