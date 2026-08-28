@@ -154,7 +154,7 @@ export const flipBinaryDigit = (
 
 
 
-/**
+/*
  * Converts the player's eight binary digits into a decimal number
  *
  * The calculation reads the bits from left to right
@@ -214,8 +214,8 @@ const createTarget = (
 });
 
 
-/**
- * Finds the lowest target on the screen.
+/*
+ * Finds the lowest target on the screen
  *
  * A larger y-coordinate means that a target is lower on the grid
  * The function returns undefined when there is no target
@@ -232,11 +232,11 @@ export const getLowestTarget = (
         undefined,
     );
 
-/**
+/*
  * Calculates target speed from survival time.
  *
  * The speed rises smoothly from 4 to 10 over two minutes and is
- * capped so the game remains playable.
+ * capped so the game remains functionable.
  */
 export const targetSpeed = (elapsedTicks: number): number =>
     Math.min(
@@ -271,14 +271,14 @@ export const updateCompletedChallenges = (
     );
 };
 
-/**
+/*
  * Moves the game forward by one time step.
  *
  * This function:
- * 1. moves existing targets;
- * 2. creates a target when required;
- * 3. finds the lowest target;
- * 4. checks it when it reaches the check line.
+ * 1. moves existing targets
+ * 2. creates a target when required
+ * 3. finds the lowest target
+ * 4. checks it when it reaches the check line
  */
 export const tick = (state: State): State => {
     // A finished game should no longer move or create targets.
@@ -291,10 +291,10 @@ export const tick = (state: State): State => {
     const nextElapsedTicks = state.elapsedTicks + 1;
     const currentTargetSpeed = targetSpeed(state.elapsedTicks);
 
-    /**
-     * Create a new array containing moved targets.
+    /*
+     * Create a new array containing moving targets.
      *
-     * map does not modify the objects in state.targets.
+     * map does not modify the objects in state targets
      */
     const movedTargets = state.targets.map(target => ({
         ...target,
@@ -361,9 +361,9 @@ export const tick = (state: State): State => {
     };
 };
 
-/**
- * Creates a fresh game while retaining scores from earlier attempts.
- * Scores live only in memory and disappear when the page is reloaded.
+/*
+ Creates a fresh game while retaining scores from earlier attempts.
+ Scores live only in memory and disappear when the page is reloaded.
  */
 export const restartGame = (state: State): State => ({
     ...initialState,
@@ -373,7 +373,7 @@ export const restartGame = (state: State): State => ({
             : state.scoreHistory,
 });
 
-/**
+/*
  * Produces the next state from the current state
  *
  * This function is pure:
