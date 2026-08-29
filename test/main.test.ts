@@ -8,6 +8,7 @@ import {
     createTarget,
     flipBinaryDigit,
     flipBit,
+    generateChallengeGoals,
     getLowestTarget,
     initialState,
     reduceState,
@@ -267,6 +268,36 @@ describe("challenges", () => {
         x: 100,
         y: 260,
     };
+
+    it("generates the same challenge goals from the same seed", () => {
+        expect(generateChallengeGoals(123)).toEqual(
+            generateChallengeGoals(123),
+        );
+    });
+
+    it("generates achievable challenge goals inside the chosen ranges", () => {
+        const { goals } = generateChallengeGoals(123);
+
+        expect(goals.scoreTarget).toBeGreaterThanOrEqual(8);
+        expect(goals.scoreTarget).toBeLessThanOrEqual(12);
+        expect(goals.fastTargetCount).toBeGreaterThanOrEqual(3);
+        expect(goals.fastTargetCount).toBeLessThanOrEqual(6);
+        expect(goals.fastTimeLimitTicks).toBeGreaterThanOrEqual(120);
+        expect(goals.fastTimeLimitTicks).toBeLessThanOrEqual(200);
+        expect(goals.flawlessScoreTarget).toBeGreaterThanOrEqual(15);
+        expect(goals.flawlessScoreTarget).toBeLessThanOrEqual(25);
+    });
+
+    it("changes challenge goals when the game restarts", () => {
+        const setup = generateChallengeGoals(123);
+        const state = createTestState({
+            challengeGoals: setup.goals,
+            challengeSeed: setup.nextSeed,
+        });
+        const result = reduceState(state, { type: "Restart" });
+
+        expect(result.challengeGoals).not.toEqual(state.challengeGoals);
+    });
 
     it("awards a trophy after reaching score 10", () => {
         const result = tick(

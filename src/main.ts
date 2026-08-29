@@ -56,7 +56,14 @@ const Constants = {
     MAX_TARGET_SPAWN_MS: 3000,
     MAX_TARGET_VALUE: 0xff, //hexadecimal for 255
     CHECK_LINE_Y: 300, // targets are checked at this horizontal line
-    CHALLENGE_TIME_LIMIT_TICKS: 150,
+    MIN_SCORE_CHALLENGE: 8,
+    MAX_SCORE_CHALLENGE: 12,
+    MIN_FAST_TARGETS: 3,
+    MAX_FAST_TARGETS: 6,
+    MIN_FAST_SECONDS: 12,
+    MAX_FAST_SECONDS: 20,
+    MIN_FLAWLESS_SCORE: 15,
+    MAX_FLAWLESS_SCORE: 25,
 } as const;
 
 export type Bit = 0 | 1; //bit can be 0 or 1
@@ -83,7 +90,14 @@ export type FallingTarget = Readonly<{
     y: number;
 }>;
 
-export type ChallengeId = "scoreTen" | "fiveInFifteen" | "scoreTwenty";
+export type ChallengeId = "scoreTarget" | "timedTarget" | "flawlessTarget";
+
+export type ChallengeGoals = Readonly<{
+    scoreTarget: number;
+    fastTargetCount: number;
+    fastTimeLimitTicks: number;
+    flawlessScoreTarget: number;
+}>;
 
 /*
 state contains all the info needed to describe the game
@@ -96,6 +110,8 @@ export type State = Readonly<{
     elapsedTicks: number;
     targetsSolved: number;
     fastTargetsSolved: number;
+    challengeGoals: ChallengeGoals;
+    challengeSeed: number;
     completedChallenges: ReadonlyArray<ChallengeId>;
     scoreHistory: ReadonlyArray<number>;
     gameEnd: boolean;
@@ -118,6 +134,13 @@ export const initialState: State = {
     elapsedTicks: 0,
     targetsSolved: 0,
     fastTargetsSolved: 0,
+    challengeGoals: {
+        scoreTarget: 10,
+        fastTargetCount: 5,
+        fastTimeLimitTicks: 150,
+        flawlessScoreTarget: 20,
+    },
+    challengeSeed: 0,
     completedChallenges: [],
     scoreHistory: [],
     gameEnd: false,
@@ -176,6 +199,64 @@ export const randomInteger = (
     return {
         value: Math.floor(unitValue * (max - min + 1)) + min,
         nextSeed,
+    };
+};
+
+export type ChallengeSetup = Readonly<{
+    goals: ChallengeGoals;
+    nextSeed: number;
+}>;
+
+/**
+ * Derives a complete set of challenge goals from a seed.
+ * It is pure: equal seeds always produce equal goals and a new seed.
+ */
+export const generateChallengeGoals = (seed: number): ChallengeSetup => {
+    const scoreResult = randomInteger(
+        seed,
+        Constants.MIN_SCORE_CHALLENGE,
+        Constants.MAX_SCORE_CHALLENGE,
+    );
+    const fastCountResult = randomInteger(
+        scoreResult.nextSeed,
+        Constants.MIN_FAST_TARGETS,
+        Constants.MAX_FAST_TARGETS,
+    );
+    const fastSecondsResult = randomInteger(
+        fastCountResult.nextSeed,
+        Constants.MIN_FAST_SECONDS,
+        Constants.MAX_FAST_SECONDS,
+    );
+    const flawlessResult = randomInteger(
+        fastSecondsResult.nextSeed,
+        Constants.MIN_FLAWLESS_SCORE,
+        Constants.MAX_FLAWLESS_SCORE,
+    );
+
+    return {
+        goals: {
+            scoreTarget: scoreResult.value,
+            fastTargetCount: fastCountResult.value,
+            fastTimeLimitTicks:
+                fastSecondsResult.value * (1000 / Constants.TICK_RATE_MS),
+            flawlessScoreTarget: flawlessResult.value,
+        },
+        nextSeed: flawlessResult.nextSeed,
+    };
+};
+
+/** Creates a fresh immutable game with challenges derived from the seed. */
+export const createGameState = (
+    seed: number,
+    scoreHistory: ReadonlyArray<number> = [],
+): State => {
+    const challengeSetup = generateChallengeGoals(seed);
+
+    return {
+        ...initialState,
+        challengeGoals: challengeSetup.goals,
+        challengeSeed: challengeSetup.nextSeed,
+        scoreHistory,
     };
 };
 
@@ -302,9 +383,16 @@ export const updateCompletedChallenges = (
     state: State,
 ): ReadonlyArray<ChallengeId> => {
     const challengeResults: ReadonlyArray<readonly [ChallengeId, boolean]> = [
-        ["scoreTen", state.score >= 10],
-        ["fiveInFifteen", state.fastTargetsSolved >= 5],
-        ["scoreTwenty", state.score >= 20 && !state.gameEnd],
+        ["scoreTarget", state.score >= state.challengeGoals.scoreTarget],
+        [
+            "timedTarget",
+            state.fastTargetsSolved >= state.challengeGoals.fastTargetCount,
+        ],
+        [
+            "flawlessTarget",
+            state.score >= state.challengeGoals.flawlessScoreTarget &&
+                !state.gameEnd,
+        ],
     ];
 
     return challengeResults.reduce<ReadonlyArray<ChallengeId>>(
@@ -321,7 +409,7 @@ const resolveCorrectTarget = (
     lowestTarget: FallingTarget,
 ): State => {
     const matchedDuringChallenge =
-        state.elapsedTicks <= Constants.CHALLENGE_TIME_LIMIT_TICKS;
+        state.elapsedTicks <= state.challengeGoals.fastTimeLimitTicks;
     const matchedState: State = {
         ...state,
         targets: state.targets.filter(target => target.id !== lowestTarget.id),
@@ -373,13 +461,13 @@ export const tick = (state: State): State =>
  Creates a fresh game while retaining scores from earlier attempts.
  Scores live only in memory and disappear when the page is reloaded.
  */
-export const restartGame = (state: State): State => ({
-    ...initialState,
-    scoreHistory:
+export const restartGame = (state: State): State =>
+    createGameState(
+        state.challengeSeed,
         state.elapsedTicks > 0
             ? [...state.scoreHistory, state.score]
             : state.scoreHistory,
-});
+    );
 
 /*
  * Produces the next state from the current state
@@ -506,25 +594,33 @@ const render = (): ((state: State) => void) => {
         Readonly<{
             id: ChallengeId;
             element: HTMLElement;
+            description: (goals: ChallengeGoals) => string;
         }>
     > = [
         {
-            id: "scoreTen",
+            id: "scoreTarget",
             element: document.querySelector(
                 "#challengeScoreTen",
             ) as HTMLElement,
+            description: goals => `Reach score ${goals.scoreTarget}`,
         },
         {
-            id: "fiveInFifteen",
+            id: "timedTarget",
             element: document.querySelector(
                 "#challengeFastFive",
             ) as HTMLElement,
+            description: goals =>
+                `Solve ${goals.fastTargetCount} in ${
+                    (goals.fastTimeLimitTicks * Constants.TICK_RATE_MS) / 1000
+                } seconds`,
         },
         {
-            id: "scoreTwenty",
+            id: "flawlessTarget",
             element: document.querySelector(
                 "#challengeScoreTwenty",
             ) as HTMLElement,
+            description: goals =>
+                `Reach score ${goals.flawlessScoreTarget} without a mistake`,
         },
     ];
 
@@ -644,12 +740,16 @@ const render = (): ((state: State) => void) => {
         scoreHistoryList.replaceChildren(...historyItems);
         emptyScoreHistory.hidden = state.scoreHistory.length > 0;
 
-        challengeElements.forEach(({ id, element }) => {
+        challengeElements.forEach(({ id, element, description }) => {
             const isComplete = state.completedChallenges.includes(id);
             const trophy = element.querySelector(".trophy") as HTMLElement;
+            const challengeText = element.querySelector(
+                ".challengeText",
+            ) as HTMLElement;
 
             element.classList.toggle("completed", isComplete);
             trophy.textContent = isComplete ? "🏆" : "○";
+            challengeText.textContent = description(state.challengeGoals);
         });
 
         binaryDigitElements.forEach(({ rectangle, text }, index) => {
@@ -705,11 +805,13 @@ export const state$ = (): Observable<State> => {
         "#restartButton",
     ) as HTMLButtonElement;
 
+    const startingState = createGameState(createInitialSeed());
+
     const tick$ = interval(Constants.TICK_RATE_MS).pipe(
         map((): GameEvent => ({ type: "Tick" })),
     );
 
-    const spawnTarget$ = createTargetStream(createInitialSeed());
+    const spawnTarget$ = createTargetStream(startingState.challengeSeed);
 
     const digitKey$ = fromEvent<KeyboardEvent>(document, "keydown").pipe(
         filter(({ code, repeat }) => !repeat && /^Digit[1-8]$/.test(code)), //only keyboard keys 1-8 are allowed
@@ -748,8 +850,8 @@ export const state$ = (): Observable<State> => {
     );
 
     return merge(tick$, spawnTarget$, digitKey$, digitClick$, restart$).pipe(
-        scan(reduceState, initialState),
-        startWith(initialState),
+        scan(reduceState, startingState),
+        startWith(startingState),
     );
 }; //scan remembers the previous state and uses the reducer to calculate the next one
 
