@@ -163,6 +163,6 @@ svg rect {
  Both the rectangle and text contain this data attribute.
  This doesn't control the game, it gives visual feedback that the digits can be clicked
  */
- [data-digit-index] {
+[data-digit-index] {
     cursor: pointer;
 }

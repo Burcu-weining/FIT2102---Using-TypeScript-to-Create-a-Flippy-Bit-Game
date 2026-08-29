@@ -5,6 +5,7 @@ import {
     FallingTarget,
     State,
     binaryToDecimal,
+    createTarget,
     flipBinaryDigit,
     flipBit,
     getLowestTarget,
@@ -20,9 +21,7 @@ import {
  *
  * Individual tests can override only the properties they need.
  */
-const createTestState = (
-    changes: Partial<State> = {},
-): State => ({
+const createTestState = (changes: Partial<State> = {}): State => ({
     ...initialState,
     ...changes,
 });
@@ -37,32 +36,35 @@ describe("binary digit functions", () => {
     });
 
     it("flips only the selected binary digit", () => {
-        const original: BinaryDigits = [
-            0, 0, 0, 0, 0, 0, 0, 0,
-        ];
+        const original: BinaryDigits = [0, 0, 0, 0, 0, 0, 0, 0];
 
         const result = flipBinaryDigit(original, 3);
 
-        expect(result).toEqual([
-            0, 0, 0, 1, 0, 0, 0, 0,
-        ]);
+        expect(result).toEqual([0, 0, 0, 1, 0, 0, 0, 0]);
 
         // The original value must remain unchanged.
-        expect(original).toEqual([
-            0, 0, 0, 0, 0, 0, 0, 0,
-        ]);
+        expect(original).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
     });
 
     it("converts eight binary digits to decimal", () => {
-        const binaryThirteen: BinaryDigits = [
-            0, 0, 0, 0, 1, 1, 0, 1,
-        ];
+        const binaryThirteen: BinaryDigits = [0, 0, 0, 0, 1, 1, 0, 1];
 
         expect(binaryToDecimal(binaryThirteen)).toBe(13);
     });
 });
 
 describe("target selection", () => {
+    it("creates a target at the supplied horizontal position", () => {
+        const target = createTarget(4, 42, 275);
+
+        expect(target).toEqual({
+            id: 4,
+            hexadecimalValue: 42,
+            x: 275,
+            y: -36,
+        });
+    });
+
     it("returns undefined when there are no targets", () => {
         expect(getLowestTarget([])).toBeUndefined();
     });
@@ -72,16 +74,19 @@ describe("target selection", () => {
             {
                 id: 0,
                 hexadecimalValue: 13,
+                x: 100,
                 y: 40,
             },
             {
                 id: 1,
                 hexadecimalValue: 42,
+                x: 200,
                 y: 170,
             },
             {
                 id: 2,
                 hexadecimalValue: 7,
+                x: 300,
                 y: 90,
             },
         ];
@@ -95,6 +100,7 @@ describe("game state reducer", () => {
         const target: FallingTarget = {
             id: 0,
             hexadecimalValue: 13,
+            x: 100,
             y: -36,
         };
 
@@ -113,9 +119,7 @@ describe("game state reducer", () => {
             index: 7,
         });
 
-        expect(result.binaryDigits).toEqual([
-            0, 0, 0, 0, 0, 0, 0, 1,
-        ]);
+        expect(result.binaryDigits).toEqual([0, 0, 0, 0, 0, 0, 0, 1]);
     });
 
     it("ignores input after the game ends", () => {
@@ -137,6 +141,7 @@ describe("target movement", () => {
         const target: FallingTarget = {
             id: 0,
             hexadecimalValue: 13,
+            x: 100,
             y: 100,
         };
 
@@ -151,9 +156,7 @@ describe("target movement", () => {
     });
 
     it("removes a correctly matched target at the line", () => {
-        const binaryThirteen: BinaryDigits = [
-            0, 0, 0, 0, 1, 1, 0, 1,
-        ];
+        const binaryThirteen: BinaryDigits = [0, 0, 0, 0, 1, 1, 0, 1];
 
         const state = createTestState({
             binaryDigits: binaryThirteen,
@@ -161,6 +164,7 @@ describe("target movement", () => {
                 {
                     id: 0,
                     hexadecimalValue: 13,
+                    x: 100,
 
                     // At the starting speed, its bottom reaches 300.
                     y: 260,
@@ -181,6 +185,7 @@ describe("target movement", () => {
                 {
                     id: 0,
                     hexadecimalValue: 13,
+                    x: 100,
                     y: 260,
                 },
             ],
@@ -193,27 +198,27 @@ describe("target movement", () => {
 });
 
 describe("random integer generation", () => {
-    it("can produce the minimum value", () => {
-        const alwaysMinimum = (): number => 0;
-
-        expect(
-            randomInteger(1000, 3000, alwaysMinimum),
-        ).toBe(1000);
+    it("produces the same result from the same seed", () => {
+        expect(randomInteger(123, 0, 255)).toEqual(randomInteger(123, 0, 255));
     });
 
-    it("can produce the maximum value", () => {
-        const almostOne = (): number => 0.999999;
+    it("produces a value inside the requested range", () => {
+        const result = randomInteger(123, 1000, 3000);
 
-        expect(
-            randomInteger(1000, 3000, almostOne),
-        ).toBe(3000);
+        expect(result.value).toBeGreaterThanOrEqual(1000);
+        expect(result.value).toBeLessThanOrEqual(3000);
+    });
+
+    it("uses the returned seed for the next value", () => {
+        const first = randomInteger(123, 0, 255);
+        const second = randomInteger(first.nextSeed, 0, 255);
+
+        expect(second.nextSeed).not.toBe(first.nextSeed);
     });
 });
 
 it("adds one point to the existing score", () => {
-    const binaryThirteen: BinaryDigits = [
-        0, 0, 0, 0, 1, 1, 0, 1,
-    ];
+    const binaryThirteen: BinaryDigits = [0, 0, 0, 0, 1, 1, 0, 1];
 
     const state = createTestState({
         binaryDigits: binaryThirteen,
@@ -222,6 +227,7 @@ it("adds one point to the existing score", () => {
             {
                 id: 0,
                 hexadecimalValue: 13,
+                x: 100,
 
                 // At the starting speed, its bottom reaches 300.
                 y: 260,
@@ -253,13 +259,12 @@ describe("target speed", () => {
 });
 
 describe("challenges", () => {
-    const binaryThirteen: BinaryDigits = [
-        0, 0, 0, 0, 1, 1, 0, 1,
-    ];
+    const binaryThirteen: BinaryDigits = [0, 0, 0, 0, 1, 1, 0, 1];
 
     const targetThirteen: FallingTarget = {
         id: 0,
         hexadecimalValue: 13,
+        x: 100,
         y: 260,
     };
 
@@ -285,9 +290,7 @@ describe("challenges", () => {
             }),
         );
 
-        expect(result.completedChallenges).toContain(
-            "fiveInFifteen",
-        );
+        expect(result.completedChallenges).toContain("fiveInFifteen");
     });
 
     it("does not count fast matches after 15 seconds", () => {
@@ -301,9 +304,7 @@ describe("challenges", () => {
         );
 
         expect(result.fastTargetsSolved).toBe(4);
-        expect(result.completedChallenges).not.toContain(
-            "fiveInFifteen",
-        );
+        expect(result.completedChallenges).not.toContain("fiveInFifteen");
     });
 
     it("awards a trophy after reaching score 20", () => {
@@ -315,9 +316,7 @@ describe("challenges", () => {
             }),
         );
 
-        expect(result.completedChallenges).toContain(
-            "scoreTwenty",
-        );
+        expect(result.completedChallenges).toContain("scoreTwenty");
     });
 });
 
@@ -327,13 +326,12 @@ describe("score history", () => {
             createTestState({
                 score: 7,
                 elapsedTicks: 50,
-                binaryDigits: [
-                    1, 1, 1, 1, 1, 1, 1, 1,
-                ],
+                binaryDigits: [1, 1, 1, 1, 1, 1, 1, 1],
                 targets: [
                     {
                         id: 1,
                         hexadecimalValue: 13,
+                        x: 100,
                         y: 100,
                     },
                 ],
@@ -344,9 +342,7 @@ describe("score history", () => {
         expect(result.scoreHistory).toEqual([7]);
         expect(result.score).toBe(0);
         expect(result.targets).toEqual([]);
-        expect(result.binaryDigits).toEqual(
-            initialState.binaryDigits,
-        );
+        expect(result.binaryDigits).toEqual(initialState.binaryDigits);
         expect(result.elapsedTicks).toBe(0);
     });
 
@@ -364,10 +360,7 @@ describe("score history", () => {
     });
 
     it("does not record an unplayed game", () => {
-        const result = reduceState(
-            initialState,
-            { type: "Restart" },
-        );
+        const result = reduceState(initialState, { type: "Restart" });
 
         expect(result.scoreHistory).toEqual([]);
     });
