@@ -28,7 +28,6 @@ import {
     scan,
     share,
     shareReplay,
-    skip,
     startWith,
     switchMap,
     take,
@@ -371,6 +370,24 @@ const createTargetStream = (
             ),
             map(({ event }) => event),
         ),
+    );
+
+/**
+ * Starts a fresh deterministic target sequence initially and after every
+ * restart. switchMap cancels any unfinished delay from the previous game.
+ */
+export const createRestartingTargetStream = (
+    initialSeed: number,
+    restart$: Observable<unknown>,
+    activePulse$: Observable<number>,
+): Observable<GameEvent> =>
+    restart$.pipe(
+        scan(
+            seed => randomInteger(seed, 0, CONSTANTS.MAX_TARGET_VALUE).nextSeed,
+            initialSeed,
+        ),
+        startWith(initialSeed),
+        switchMap(seed => createTargetStream(seed, activePulse$)),
     );
 
 /**
@@ -868,8 +885,17 @@ export const state$ = (): Observable<State> => {
 
     const startingState = createGameState(createInitialSeed());
 
-    const isPaused$ = fromEvent(pauseButton, "click").pipe(
-        scan(isPaused => !isPaused, false),
+    const pauseClick$ = fromEvent(pauseButton, "click").pipe(share());
+    const restartClick$ = fromEvent(restartButton, "click").pipe(share());
+
+    const isPaused$ = merge(
+        pauseClick$.pipe(map(() => "toggle" as const)),
+        restartClick$.pipe(map(() => "resume" as const)),
+    ).pipe(
+        scan(
+            (isPaused, command) => (command === "toggle" ? !isPaused : false),
+            false,
+        ),
         startWith(false),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
@@ -878,8 +904,9 @@ export const state$ = (): Observable<State> => {
 
     const tick$ = activePulse$.pipe(map((): GameEvent => ({ type: "Tick" })));
 
-    const spawnTarget$ = createTargetStream(
+    const spawnTarget$ = createRestartingTargetStream(
         startingState.challengeSeed,
+        restartClick$,
         activePulse$,
     );
 
@@ -915,12 +942,11 @@ export const state$ = (): Observable<State> => {
         ),
     );
 
-    const restart$ = fromEvent(restartButton, "click").pipe(
+    const restart$ = restartClick$.pipe(
         map((): GameEvent => ({ type: "Restart" })),
     );
 
-    const pause$ = isPaused$.pipe(
-        skip(1),
+    const pause$ = pauseClick$.pipe(
         map((): GameEvent => ({ type: "TogglePause" })),
     );
 

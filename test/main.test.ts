@@ -7,6 +7,7 @@ import {
     State,
     binaryToDecimal,
     createActivePulseStream,
+    createRestartingTargetStream,
     createTarget,
     flipBinaryDigit,
     flipBit,
@@ -52,6 +53,50 @@ describe("active game clock", () => {
 
         subscription.unsubscribe();
         vi.useRealTimers();
+    });
+});
+
+describe("restarting target stream", () => {
+    it("cancels the old delay and starts a fresh target sequence", () => {
+        const initialSeed = 123;
+        const restart$ = new Subject<void>();
+        const activePulse$ = new Subject<number>();
+        const targetObserver = vi.fn();
+        const subscription = createRestartingTargetStream(
+            initialSeed,
+            restart$,
+            activePulse$,
+        ).subscribe(targetObserver);
+        const emitPulses = (count: number): void =>
+            Array.from({ length: count }, (_, pulse) => pulse).forEach(pulse =>
+                activePulse$.next(pulse),
+            );
+        const initialDelayTicks = Math.ceil(
+            randomInteger(initialSeed, 1000, 3000).value / 100,
+        );
+
+        emitPulses(initialDelayTicks - 1);
+        expect(targetObserver).not.toHaveBeenCalled();
+
+        restart$.next();
+        const restartSeed = randomInteger(initialSeed, 0, 255).nextSeed;
+        const restartedDelayTicks = Math.ceil(
+            randomInteger(restartSeed, 1000, 3000).value / 100,
+        );
+
+        emitPulses(restartedDelayTicks - 1);
+        expect(targetObserver).not.toHaveBeenCalled();
+
+        emitPulses(1);
+        expect(targetObserver).toHaveBeenCalledTimes(1);
+        expect(targetObserver).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: "SpawnTarget",
+                target: expect.objectContaining({ id: 0 }),
+            }),
+        );
+
+        subscription.unsubscribe();
     });
 });
 
