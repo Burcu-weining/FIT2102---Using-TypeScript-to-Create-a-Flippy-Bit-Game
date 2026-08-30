@@ -30,21 +30,21 @@ import {
     timer, //waits once for a specified duration
 } from "rxjs";
 
-/*Constants:
+/* Constants:
  * Values controlling the game dimensions, timing, and difficulty.
  */
 
-const Viewport = {
+const VIEWPORT = {
     CANVAS_WIDTH: 600,
     CANVAS_HEIGHT: 400,
 } as const;
 
-const Target = {
+const TARGET = {
     WIDTH: 64,
     HEIGHT: 36,
 } as const;
 
-const Constants = {
+const CONSTANTS = {
     DIGIT_COUNT: 8,
     TICK_RATE_MS: 100, // this updates the state 10 times per second
     // Start slowly, then increase smoothly as survival time grows.
@@ -154,17 +154,26 @@ returns the opposite binary value
 */
 export const flipBit = (bit: Bit): Bit => (bit === 0 ? 1 : 0);
 
+const updateBit = (bit: Bit, index: number, selectedIndex: number): Bit =>
+    index === selectedIndex ? flipBit(bit) : bit;
+
 /*
-this part returns a new set of binary digits with one selected digit that would be flipped
-and the original binary digits are not modified.
+Returns a new eight-element tuple with only the selected bit flipped.
+Writing the tuple explicitly preserves its exact length without a type assertion.
 */
 export const flipBinaryDigit = (
     binaryDigits: BinaryDigits,
     selectedIndex: number,
-): BinaryDigits =>
-    binaryDigits.map((bit, index) =>
-        index === selectedIndex ? flipBit(bit) : bit,
-    ) as unknown as BinaryDigits;
+): BinaryDigits => [
+    updateBit(binaryDigits[0], 0, selectedIndex),
+    updateBit(binaryDigits[1], 1, selectedIndex),
+    updateBit(binaryDigits[2], 2, selectedIndex),
+    updateBit(binaryDigits[3], 3, selectedIndex),
+    updateBit(binaryDigits[4], 4, selectedIndex),
+    updateBit(binaryDigits[5], 5, selectedIndex),
+    updateBit(binaryDigits[6], 6, selectedIndex),
+    updateBit(binaryDigits[7], 7, selectedIndex),
+];
 
 /*
  * Converts the player's eight binary digits into a decimal number
@@ -217,23 +226,23 @@ export type ChallengeSetup = Readonly<{
 export const generateChallengeGoals = (seed: number): ChallengeSetup => {
     const scoreResult = randomInteger(
         seed,
-        Constants.MIN_SCORE_CHALLENGE,
-        Constants.MAX_SCORE_CHALLENGE,
+        CONSTANTS.MIN_SCORE_CHALLENGE,
+        CONSTANTS.MAX_SCORE_CHALLENGE,
     );
     const fastCountResult = randomInteger(
         scoreResult.nextSeed,
-        Constants.MIN_FAST_TARGETS,
-        Constants.MAX_FAST_TARGETS,
+        CONSTANTS.MIN_FAST_TARGETS,
+        CONSTANTS.MAX_FAST_TARGETS,
     );
     const fastSecondsResult = randomInteger(
         fastCountResult.nextSeed,
-        Constants.MIN_FAST_SECONDS,
-        Constants.MAX_FAST_SECONDS,
+        CONSTANTS.MIN_FAST_SECONDS,
+        CONSTANTS.MAX_FAST_SECONDS,
     );
     const flawlessResult = randomInteger(
         fastSecondsResult.nextSeed,
-        Constants.MIN_FLAWLESS_SCORE,
-        Constants.MAX_FLAWLESS_SCORE,
+        CONSTANTS.MIN_FLAWLESS_SCORE,
+        CONSTANTS.MAX_FLAWLESS_SCORE,
     );
 
     return {
@@ -241,7 +250,7 @@ export const generateChallengeGoals = (seed: number): ChallengeSetup => {
             scoreTarget: scoreResult.value,
             fastTargetCount: fastCountResult.value,
             fastTimeLimitTicks:
-                fastSecondsResult.value * (1000 / Constants.TICK_RATE_MS),
+                fastSecondsResult.value * (1000 / CONSTANTS.TICK_RATE_MS),
             flawlessScoreTarget: flawlessResult.value,
         },
         nextSeed: flawlessResult.nextSeed,
@@ -283,7 +292,7 @@ export const createTarget = (
     id,
     hexadecimalValue,
     x,
-    y: -Target.HEIGHT, // Begin just above the visible box in the game
+    y: -TARGET.HEIGHT, // Begin just above the visible box in the game
 });
 
 type TargetSequence = Readonly<{
@@ -305,18 +314,18 @@ const scheduleTarget = (
 ): Observable<ScheduledTarget> => {
     const delayResult = randomInteger(
         sequence.seed,
-        Constants.MIN_TARGET_SPAWN_MS,
-        Constants.MAX_TARGET_SPAWN_MS,
+        CONSTANTS.MIN_TARGET_SPAWN_MS,
+        CONSTANTS.MAX_TARGET_SPAWN_MS,
     );
     const valueResult = randomInteger(
         delayResult.nextSeed,
         0,
-        Constants.MAX_TARGET_VALUE,
+        CONSTANTS.MAX_TARGET_VALUE,
     );
     const xResult = randomInteger(
         valueResult.nextSeed,
         0,
-        Viewport.CANVAS_WIDTH - Target.WIDTH,
+        VIEWPORT.CANVAS_WIDTH - TARGET.WIDTH,
     );
 
     return timer(delayResult.value).pipe(
@@ -373,10 +382,10 @@ export const getLowestTarget = (
  */
 export const targetSpeed = (elapsedTicks: number): number =>
     Math.min(
-        Constants.STARTING_TARGET_SPEED +
-            (Constants.MAX_TARGET_SPEED - Constants.STARTING_TARGET_SPEED) *
-                (elapsedTicks / Constants.TICKS_TO_MAX_SPEED),
-        Constants.MAX_TARGET_SPEED,
+        CONSTANTS.STARTING_TARGET_SPEED +
+            (CONSTANTS.MAX_TARGET_SPEED - CONSTANTS.STARTING_TARGET_SPEED) *
+                (elapsedTicks / CONSTANTS.TICKS_TO_MAX_SPEED),
+        CONSTANTS.MAX_TARGET_SPEED,
     );
 
 /*
@@ -449,7 +458,7 @@ const advanceActiveState = (state: State): State => {
 
     return lowestTarget === undefined
         ? movedState
-        : lowestTarget.y + Target.HEIGHT < Constants.CHECK_LINE_Y
+        : lowestTarget.y + TARGET.HEIGHT < CONSTANTS.CHECK_LINE_Y
           ? movedState
           : resolveLowestTarget(movedState, lowestTarget);
 };
@@ -625,7 +634,7 @@ const render = (): ((state: State) => void) => {
             ) as HTMLElement,
             description: goals =>
                 `Solve ${goals.fastTargetCount} in ${
-                    (goals.fastTimeLimitTicks * Constants.TICK_RATE_MS) / 1000
+                    (goals.fastTimeLimitTicks * CONSTANTS.TICK_RATE_MS) / 1000
                 } seconds`,
         },
         {
@@ -640,7 +649,7 @@ const render = (): ((state: State) => void) => {
 
     svg.setAttribute(
         "viewBox",
-        `0 0 ${Viewport.CANVAS_WIDTH} ${Viewport.CANVAS_HEIGHT}`,
+        `0 0 ${VIEWPORT.CANVAS_WIDTH} ${VIEWPORT.CANVAS_HEIGHT}`,
     );
 
     /**
@@ -649,9 +658,9 @@ const render = (): ((state: State) => void) => {
      */
     const checkLine = createSvgElement(svg.namespaceURI, "line", {
         x1: "0",
-        y1: `${Constants.CHECK_LINE_Y}`,
-        x2: `${Viewport.CANVAS_WIDTH}`,
-        y2: `${Constants.CHECK_LINE_Y}`,
+        y1: `${CONSTANTS.CHECK_LINE_Y}`,
+        x2: `${VIEWPORT.CANVAS_WIDTH}`,
+        y2: `${CONSTANTS.CHECK_LINE_Y}`,
         stroke: "yellow",
         "stroke-width": "3",
         "stroke-dasharray": "8 5",
@@ -664,15 +673,15 @@ const render = (): ((state: State) => void) => {
     svg.appendChild(checkLine);
     svg.appendChild(targetLayer);
 
-    const digitWidth = Viewport.CANVAS_WIDTH / Constants.DIGIT_COUNT;
+    const digitWidth = VIEWPORT.CANVAS_WIDTH / CONSTANTS.DIGIT_COUNT;
 
     const binaryDigitElements: ReadonlyArray<BinaryDigitElements> = Array.from(
-        { length: Constants.DIGIT_COUNT },
+        { length: CONSTANTS.DIGIT_COUNT },
         (_, index) => {
             const rectangle = createSvgElement(svg.namespaceURI, "rect", {
                 "data-digit-index": String(index),
                 x: `${index * digitWidth + 4}`,
-                y: `${Viewport.CANVAS_HEIGHT - 50}`,
+                y: `${VIEWPORT.CANVAS_HEIGHT - 50}`,
                 width: `${digitWidth - 8}`,
                 height: "40",
                 fill: "#ef9a9a",
@@ -683,7 +692,7 @@ const render = (): ((state: State) => void) => {
             const text = createSvgElement(svg.namespaceURI, "text", {
                 "data-digit-index": String(index),
                 x: `${index * digitWidth + digitWidth / 2}`,
-                y: `${Viewport.CANVAS_HEIGHT - 22}`,
+                y: `${VIEWPORT.CANVAS_HEIGHT - 22}`,
                 "text-anchor": "middle",
                 "font-family": "monospace",
                 "font-size": "20",
@@ -708,8 +717,8 @@ const render = (): ((state: State) => void) => {
         const rectangle = createSvgElement(svg.namespaceURI, "rect", {
             x: `${target.x}`,
             y: `${target.y}`,
-            width: `${Target.WIDTH}`,
-            height: `${Target.HEIGHT}`,
+            width: `${TARGET.WIDTH}`,
+            height: `${TARGET.HEIGHT}`,
             rx: "6",
             fill: "white",
             stroke: "black",
@@ -717,8 +726,8 @@ const render = (): ((state: State) => void) => {
         });
 
         const text = createSvgElement(svg.namespaceURI, "text", {
-            x: `${target.x + Target.WIDTH / 2}`,
-            y: `${target.y + Target.HEIGHT / 2 + 7}`,
+            x: `${target.x + TARGET.WIDTH / 2}`,
+            y: `${target.y + TARGET.HEIGHT / 2 + 7}`,
             "text-anchor": "middle",
             "font-family": "monospace",
             "font-size": "20",
@@ -787,7 +796,7 @@ const render = (): ((state: State) => void) => {
             elements.rectangle.setAttribute("y", String(target.y));
             elements.text.setAttribute(
                 "y",
-                String(target.y + Target.HEIGHT / 2 + 7),
+                String(target.y + TARGET.HEIGHT / 2 + 7),
             );
         });
 
@@ -830,7 +839,7 @@ export const state$ = (): Observable<State> => {
 
     const startingState = createGameState(createInitialSeed());
 
-    const tick$ = interval(Constants.TICK_RATE_MS).pipe(
+    const tick$ = interval(CONSTANTS.TICK_RATE_MS).pipe(
         map((): GameEvent => ({ type: "Tick" })),
     );
 
@@ -858,7 +867,7 @@ export const state$ = (): Observable<State> => {
             index =>
                 Number.isInteger(index) &&
                 index >= 0 &&
-                index < Constants.DIGIT_COUNT,
+                index < CONSTANTS.DIGIT_COUNT,
         ),
         map(
             (index): GameEvent => ({
