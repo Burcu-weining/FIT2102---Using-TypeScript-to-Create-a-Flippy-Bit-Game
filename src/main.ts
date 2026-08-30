@@ -15,19 +15,23 @@
 import "./style.css";
 
 import {
+    NEVER,
     Observable,
+    defer,
+    expand,
     filter,
     fromEvent,
     interval,
+    last,
     map,
     merge, //merge combines multiple observables.
     scan,
+    share,
+    shareReplay,
+    skip,
     startWith,
     switchMap,
     take,
-    defer, //creates new random sequence whenever the game starts
-    expand, //schedules the next target after the previous target is emitted
-    timer, //waits once for a specified duration
 } from "rxjs";
 
 /* Constants:
@@ -311,6 +315,7 @@ type ScheduledTarget = Readonly<{
  */
 const scheduleTarget = (
     sequence: TargetSequence,
+    activePulse$: Observable<number>,
 ): Observable<ScheduledTarget> => {
     const delayResult = randomInteger(
         sequence.seed,
@@ -327,8 +332,11 @@ const scheduleTarget = (
         0,
         VIEWPORT.CANVAS_WIDTH - TARGET.WIDTH,
     );
+    const delayTicks = Math.ceil(delayResult.value / CONSTANTS.TICK_RATE_MS);
 
-    return timer(delayResult.value).pipe(
+    return activePulse$.pipe(
+        take(delayTicks),
+        last(),
         map(() => ({
             nextSequence: {
                 seed: xResult.nextSeed,
@@ -346,15 +354,36 @@ const scheduleTarget = (
     );
 };
 
-const createTargetStream = (initialSeed: number): Observable<GameEvent> =>
+const createTargetStream = (
+    initialSeed: number,
+    activePulse$: Observable<number>,
+): Observable<GameEvent> =>
     defer(() =>
-        scheduleTarget({
-            seed: initialSeed,
-            nextTargetId: 0,
-        }).pipe(
-            expand(({ nextSequence }) => scheduleTarget(nextSequence)),
+        scheduleTarget(
+            {
+                seed: initialSeed,
+                nextTargetId: 0,
+            },
+            activePulse$,
+        ).pipe(
+            expand(({ nextSequence }) =>
+                scheduleTarget(nextSequence, activePulse$),
+            ),
             map(({ event }) => event),
         ),
+    );
+
+/**
+ * Emits clock pulses only while the game is active. Switching to NEVER
+ * suspends every consumer of this shared clock until play resumes.
+ */
+export const createActivePulseStream = (
+    isPaused$: Observable<boolean>,
+    tickRateMs: number = CONSTANTS.TICK_RATE_MS,
+): Observable<number> =>
+    isPaused$.pipe(
+        switchMap(isPaused => (isPaused ? NEVER : interval(tickRateMs))),
+        share(),
     );
 
 /*
@@ -839,11 +868,20 @@ export const state$ = (): Observable<State> => {
 
     const startingState = createGameState(createInitialSeed());
 
-    const tick$ = interval(CONSTANTS.TICK_RATE_MS).pipe(
-        map((): GameEvent => ({ type: "Tick" })),
+    const isPaused$ = fromEvent(pauseButton, "click").pipe(
+        scan(isPaused => !isPaused, false),
+        startWith(false),
+        shareReplay({ bufferSize: 1, refCount: true }),
     );
 
-    const spawnTarget$ = createTargetStream(startingState.challengeSeed);
+    const activePulse$ = createActivePulseStream(isPaused$);
+
+    const tick$ = activePulse$.pipe(map((): GameEvent => ({ type: "Tick" })));
+
+    const spawnTarget$ = createTargetStream(
+        startingState.challengeSeed,
+        activePulse$,
+    );
 
     const digitKey$ = fromEvent<KeyboardEvent>(document, "keydown").pipe(
         filter(({ code, repeat }) => !repeat && /^Digit[1-8]$/.test(code)), //only keyboard keys 1-8 are allowed
@@ -881,7 +919,8 @@ export const state$ = (): Observable<State> => {
         map((): GameEvent => ({ type: "Restart" })),
     );
 
-    const pause$ = fromEvent(pauseButton, "click").pipe(
+    const pause$ = isPaused$.pipe(
+        skip(1),
         map((): GameEvent => ({ type: "TogglePause" })),
     );
 

@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { Subject } from "rxjs";
+import { describe, expect, it, vi } from "vitest";
 
 import {
     BinaryDigits,
     FallingTarget,
     State,
     binaryToDecimal,
+    createActivePulseStream,
     createTarget,
     flipBinaryDigit,
     flipBit,
@@ -25,6 +27,32 @@ import {
 const createTestState = (changes: Partial<State> = {}): State => ({
     ...initialState,
     ...changes,
+});
+
+describe("active game clock", () => {
+    it("stops emitting while paused and resumes afterward", () => {
+        vi.useFakeTimers();
+        const isPaused$ = new Subject<boolean>();
+        const pulseObserver = vi.fn();
+        const subscription = createActivePulseStream(isPaused$, 100).subscribe(
+            pulseObserver,
+        );
+
+        isPaused$.next(false);
+        vi.advanceTimersByTime(250);
+        expect(pulseObserver).toHaveBeenCalledTimes(2);
+
+        isPaused$.next(true);
+        vi.advanceTimersByTime(500);
+        expect(pulseObserver).toHaveBeenCalledTimes(2);
+
+        isPaused$.next(false);
+        vi.advanceTimersByTime(200);
+        expect(pulseObserver).toHaveBeenCalledTimes(4);
+
+        subscription.unsubscribe();
+        vi.useRealTimers();
+    });
 });
 
 describe("binary digit functions", () => {
