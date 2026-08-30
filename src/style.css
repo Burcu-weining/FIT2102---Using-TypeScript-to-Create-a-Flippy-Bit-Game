@@ -84,7 +84,8 @@ svg rect {
     font-weight: bold;
 }
 
-#restartButton {
+#restartButton,
+#pauseButton {
     cursor: pointer;
     font-size: 1em;
     font-weight: bold;
@@ -152,7 +153,8 @@ svg rect {
     float: right;
 }
 
-#gameOver {
+#gameOver,
+#paused {
     font-size: 1.5em;
     font-weight: bolder;
     text-align: center;

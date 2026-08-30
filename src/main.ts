@@ -114,6 +114,7 @@ export type State = Readonly<{
     challengeSeed: number;
     completedChallenges: ReadonlyArray<ChallengeId>;
     scoreHistory: ReadonlyArray<number>;
+    isPaused: boolean;
     gameEnd: boolean;
 }>;
 
@@ -122,6 +123,7 @@ export type GameEvent = //events describe things that can change the game state
         | Readonly<{ type: "Tick" }> //tick represents time passing
         | Readonly<{ type: "FlipBinaryDigit"; index: number }> //flipbinarydigit represents a number key being pressed
         | Readonly<{ type: "SpawnTarget"; target: FallingTarget }>
+        | Readonly<{ type: "TogglePause" }>
         | Readonly<{ type: "Restart" }>;
 
 /*
@@ -143,6 +145,7 @@ export const initialState: State = {
     challengeSeed: 0,
     completedChallenges: [],
     scoreHistory: [],
+    isPaused: false,
     gameEnd: false,
 };
 
@@ -455,7 +458,7 @@ const advanceActiveState = (state: State): State => {
  * Advances active gameplay by one immutable state transition.
  */
 export const tick = (state: State): State =>
-    state.gameEnd ? state : advanceActiveState(state);
+    state.gameEnd || state.isPaused ? state : advanceActiveState(state);
 
 /*
  Creates a fresh game while retaining scores from earlier attempts.
@@ -484,7 +487,7 @@ export const restartGame = (state: State): State =>
 export const reduceState = (state: State, event: GameEvent): State => {
     switch (event.type) {
         case "FlipBinaryDigit":
-            return state.gameEnd
+            return state.gameEnd || state.isPaused
                 ? state
                 : {
                       ...state,
@@ -495,7 +498,7 @@ export const reduceState = (state: State, event: GameEvent): State => {
                   };
 
         case "SpawnTarget":
-            return state.gameEnd
+            return state.gameEnd || state.isPaused
                 ? state
                 : {
                       ...state,
@@ -505,6 +508,11 @@ export const reduceState = (state: State, event: GameEvent): State => {
 
         case "Tick":
             return tick(state);
+
+        case "TogglePause":
+            return state.gameEnd
+                ? state
+                : { ...state, isPaused: !state.isPaused };
 
         case "Restart":
             return restartGame(state);
@@ -579,6 +587,12 @@ const render = (): ((state: State) => void) => {
     const svg = document.querySelector("#svgCanvas") as SVGSVGElement;
 
     const gameOver = document.querySelector("#gameOver") as SVGElement;
+
+    const pausedMessage = document.querySelector("#paused") as SVGElement;
+
+    const pauseButton = document.querySelector(
+        "#pauseButton",
+    ) as HTMLButtonElement;
 
     const scoreText = document.querySelector("#scoreText") as HTMLElement;
 
@@ -784,6 +798,11 @@ const render = (): ((state: State) => void) => {
         });
 
         state.gameEnd ? show(gameOver) : hide(gameOver);
+        state.isPaused && !state.gameEnd
+            ? show(pausedMessage)
+            : hide(pausedMessage);
+        pauseButton.textContent = state.isPaused ? "Resume game" : "Pause game";
+        pauseButton.disabled = state.gameEnd;
     };
 };
 
@@ -803,6 +822,10 @@ export const state$ = (): Observable<State> => {
 
     const restartButton = document.querySelector(
         "#restartButton",
+    ) as HTMLButtonElement;
+
+    const pauseButton = document.querySelector(
+        "#pauseButton",
     ) as HTMLButtonElement;
 
     const startingState = createGameState(createInitialSeed());
@@ -849,10 +872,18 @@ export const state$ = (): Observable<State> => {
         map((): GameEvent => ({ type: "Restart" })),
     );
 
-    return merge(tick$, spawnTarget$, digitKey$, digitClick$, restart$).pipe(
-        scan(reduceState, startingState),
-        startWith(startingState),
+    const pause$ = fromEvent(pauseButton, "click").pipe(
+        map((): GameEvent => ({ type: "TogglePause" })),
     );
+
+    return merge(
+        tick$,
+        spawnTarget$,
+        digitKey$,
+        digitClick$,
+        restart$,
+        pause$,
+    ).pipe(scan(reduceState, startingState), startWith(startingState));
 }; //scan remembers the previous state and uses the reducer to calculate the next one
 
 // The following simply runs your main function on window load.  Make sure to leave it in place.

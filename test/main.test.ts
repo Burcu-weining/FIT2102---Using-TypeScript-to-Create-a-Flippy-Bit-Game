@@ -135,9 +135,51 @@ describe("game state reducer", () => {
 
         expect(result).toBe(endedState);
     });
+
+    it("toggles between paused and playing", () => {
+        const pausedState = reduceState(initialState, { type: "TogglePause" });
+        const resumedState = reduceState(pausedState, { type: "TogglePause" });
+
+        expect(pausedState.isPaused).toBe(true);
+        expect(resumedState.isPaused).toBe(false);
+    });
+
+    it("ignores digit input while paused", () => {
+        const pausedState = createTestState({ isPaused: true });
+        const result = reduceState(pausedState, {
+            type: "FlipBinaryDigit",
+            index: 0,
+        });
+
+        expect(result).toBe(pausedState);
+    });
+
+    it("ignores new targets while paused", () => {
+        const pausedState = createTestState({ isPaused: true });
+        const result = reduceState(pausedState, {
+            type: "SpawnTarget",
+            target: createTarget(1, 42, 200),
+        });
+
+        expect(result).toBe(pausedState);
+    });
 });
 
 describe("target movement", () => {
+    it("freezes target positions and elapsed time while paused", () => {
+        const pausedState = createTestState({
+            isPaused: true,
+            elapsedTicks: 25,
+            targets: [createTarget(0, 13, 100)],
+        });
+
+        const result = tick(pausedState);
+
+        expect(result).toBe(pausedState);
+        expect(result.elapsedTicks).toBe(25);
+        expect(result.targets[0].y).toBe(-36);
+    });
+
     it("moves every target without mutating the old state", () => {
         const target: FallingTarget = {
             id: 0,
@@ -299,7 +341,7 @@ describe("challenges", () => {
         expect(result.challengeGoals).not.toEqual(state.challengeGoals);
     });
 
-    it("awards a trophy after reaching score 10", () => {
+    it("awards a trophy after reaching the score target", () => {
         const result = tick(
             createTestState({
                 binaryDigits: binaryThirteen,
@@ -308,10 +350,10 @@ describe("challenges", () => {
             }),
         );
 
-        expect(result.completedChallenges).toContain("scoreTen");
+        expect(result.completedChallenges).toContain("scoreTarget");
     });
 
-    it("awards a trophy for five matches in 15 seconds", () => {
+    it("awards a trophy after reaching the timed target", () => {
         const result = tick(
             createTestState({
                 binaryDigits: binaryThirteen,
@@ -321,7 +363,7 @@ describe("challenges", () => {
             }),
         );
 
-        expect(result.completedChallenges).toContain("fiveInFifteen");
+        expect(result.completedChallenges).toContain("timedTarget");
     });
 
     it("does not count fast matches after 15 seconds", () => {
@@ -335,10 +377,10 @@ describe("challenges", () => {
         );
 
         expect(result.fastTargetsSolved).toBe(4);
-        expect(result.completedChallenges).not.toContain("fiveInFifteen");
+        expect(result.completedChallenges).not.toContain("timedTarget");
     });
 
-    it("awards a trophy after reaching score 20", () => {
+    it("awards a trophy after reaching the flawless score target", () => {
         const result = tick(
             createTestState({
                 binaryDigits: binaryThirteen,
@@ -347,7 +389,7 @@ describe("challenges", () => {
             }),
         );
 
-        expect(result.completedChallenges).toContain("scoreTwenty");
+        expect(result.completedChallenges).toContain("flawlessTarget");
     });
 });
 
@@ -375,6 +417,7 @@ describe("score history", () => {
         expect(result.targets).toEqual([]);
         expect(result.binaryDigits).toEqual(initialState.binaryDigits);
         expect(result.elapsedTicks).toBe(0);
+        expect(result.isPaused).toBe(false);
     });
 
     it("appends scores from multiple games", () => {
