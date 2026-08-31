@@ -1,4 +1,5 @@
 :root {
+    /* Establish the page background and space around the game panel. */
     background-color: rgb(161, 161, 161);
     padding: 2em;
     padding-top: 4em;
@@ -16,6 +17,7 @@ td {
 }
 
 body {
+    /* Centre the heading and game vertically in a single column. */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -34,6 +36,7 @@ h1 {
 }
 
 .flex {
+    /* Shared layout utility used by both row and column containers. */
     display: flex;
     row-gap: 1em;
     column-gap: 1em;
@@ -48,6 +51,7 @@ h1 {
 }
 
 main {
+    /* The main panel wraps on narrow screens so side content remains readable. */
     background-color: rgb(238, 238, 238);
     border-radius: 0.25em;
     box-shadow: 0em 0em 0.5em rgb(20, 20, 20);
@@ -76,6 +80,7 @@ svg rect {
 }
 
 #info {
+    /* Keep the controls and score panel a consistent width beside the canvas. */
     width: 160px;
     margin-top: 1em;
 }
@@ -160,11 +165,6 @@ svg rect {
     text-align: center;
 }
 
-/*
- Show that the binary digits are interactive
- Both the rectangle and text contain this data attribute.
- This doesn't control the game, it gives visual feedback that the digits can be clicked
- */
 [data-digit-index] {
     cursor: pointer;
 }

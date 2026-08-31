@@ -1,24 +1,45 @@
+/*
+This gives typescript access to Vite's type declaations. It is
+placed before the imports because typescript reference directives
+must appear near the beginning of the file
+*/
+/// <reference types="vite/client" />
+
+/*
+main.ts is the entry point to the game. It connects the observable
+game-state stream to render and then exports important functions
+and types of testing.
+
+Keeping main.ts small makes the program easier to understand. It 
+shows how the application starts without mixing with randomness, 
+state transitions, Observable construction, or DOM rendering.
+*/
 import "./style.css";
-
 import { fromEvent, switchMap, take } from "rxjs";
+import { state$ } from "./observable"; //importing the game stream
+import { render } from "./view";       //render displays each emitted game state on the display
 
-import { state$ } from "./observable";
-import { render } from "./view";
-
+/*
+These functions are defined in observable.ts, but main.ts
+makes them avaliable from one central location
+*/
 export {
     createActivePulseStream,
     createRestartingTargetStream,
     state$,
 } from "./observable";
-export { generateChallengeGoals, randomInteger } from "./random";
+
+
 export {
     binaryToDecimal,
     createGameState,
+    generateChallengeGoals,
     createTarget,
     flipBinaryDigit,
     flipBit,
     getLowestTarget,
     initialState,
+    randomInteger,
     reduceState,
     restartGame,
     targetSpeed,
@@ -35,7 +56,7 @@ export type {
     GameEvent,
     RandomResult,
     State,
-} from "./types";
+} from "./model";
 
 // The following simply runs your main function on window load.  Make sure to leave it in place.
 // You should not need to change this, beware if you are.

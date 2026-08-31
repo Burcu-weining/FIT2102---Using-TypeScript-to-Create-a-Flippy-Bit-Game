@@ -18,12 +18,24 @@ import {
 } from "rxjs";
 import type { OperatorFunction } from "rxjs";
 
-import { CONSTANTS, TARGET, VIEWPORT } from "./constants";
-import { createInitialSeed, randomInteger } from "./random";
-import { createGameState, createTarget, reduceState } from "./state";
-import type { GameEvent, State } from "./types";
+import { CONSTANTS, TARGET, VIEWPORT } from "./model";
+import type { GameEvent, State } from "./model";
+import {
+    createGameState,
+    createInitialSeed,
+    createTarget,
+    randomInteger,
+    reduceState,
+} from "./state";
 import { queryElement } from "./dom";
 
+/*
+ TargetSequence keeps track of the current random seed and the ID
+ that will be given to the next target. ScheduledTarget then stores
+ the updated sequence together with the SpawnTarget event that should
+ happen next. This lets the program create targets one after another
+ without changing the original data
+ */
 const mapToValue = <const Value>(
     value: Value,
 ): OperatorFunction<unknown, Value> => map(() => value);
@@ -38,6 +50,20 @@ type ScheduledTarget = Readonly<{
     event: GameEvent;
 }>;
 
+/**
+ * Prepares the information needed to create one falling target.
+ *
+ * First, it uses the supplied seed to generate three random-looking values:
+ * how long to wait before showing the target, the hexadecimal number displayed
+ * on it, and its horizontal position.
+ * Each calculation also provides the seed required for the next calculation.
+ * This avoids calling Math.random again.
+ * Next, the function counts signals from activePulse$. One signal is produced
+ * every time the running game clock updates. When enough signals have been
+ * counted, the function creates a SpawnTarget event. While the game is paused,
+ * activePulse$ produces no signals. Therefore, the waiting count also pauses
+ * and continues from the same point when the player resumes the game.
+ */
 const scheduleTarget = (
     sequence: TargetSequence,
     activePulse$: Observable<number>,
@@ -79,15 +105,25 @@ const scheduleTarget = (
     );
 };
 
+/*
+ * createTargetStream creates the continuous stream of falling targets.
+ * It starts with the initial seed and target ID 0, then scheduleTarget
+ * creates the first target. expand keeps creating the next target using
+ * the updated seed and ID, while map returns only the GameEvent needed
+ * by the rest of the game.
+ */
+
 const createTargetStream = (
     initialSeed: number,
     activePulse$: Observable<number>,
 ): Observable<GameEvent> =>
+    // defer gives each subscription its own immutable target sequence.
     defer(() =>
         scheduleTarget(
             { seed: initialSeed, nextTargetId: 0 },
             activePulse$,
         ).pipe(
+            // expand schedules the next target from the previous target's seed.
             expand(({ nextSequence }) =>
                 scheduleTarget(nextSequence, activePulse$),
             ),
@@ -95,20 +131,37 @@ const createTargetStream = (
         ),
     );
 
-export const createRestartingTargetStream = (
+/*
+ * createRestartingTargetStream makes a new target stream whenever the
+ * game restarts. scan creates a new seed so the restarted game gets a
+ * different target sequence, and switchMap stops the old target stream
+ * before starting a new one with the new seed.
+ */
+
+    export const createRestartingTargetStream = (
     initialSeed: number,
     restart$: Observable<unknown>,
     activePulse$: Observable<number>,
 ): Observable<GameEvent> =>
     restart$.pipe(
+        // Advance the seed on restart so a new game receives a new sequence.
         scan(
             seed => randomInteger(seed, 0, CONSTANTS.MAX_TARGET_VALUE).nextSeed,
             initialSeed,
         ),
         startWith(initialSeed),
+        // switchMap cancels the old schedule before starting the replacement.
         switchMap(seed => createTargetStream(seed, activePulse$)),
     );
 
+
+/*
+ * createActivePulseStream controls the game's timer while pausing and
+ * resuming. When the game is paused, NEVER stops timer values from being
+ * produced. When the game resumes, interval starts producing values again
+ * at the chosen tick rate. share lets other parts of the game use the same
+ * timer stream instead of creating separate timers.
+ */
 export const createActivePulseStream = (
     isPaused$: Observable<boolean>,
     tickRateMs: number = CONSTANTS.TICK_RATE_MS,
@@ -123,6 +176,11 @@ const getClickedDigitElement = (event: MouseEvent): Element | null =>
         ? event.target.closest("[data-digit-index]")
         : null;
 
+/**
+ * Builds the event streams and reduces them into the single authoritative
+ * game-state Observable. DOM reads happen once during setup; state changes are
+ * handled by the pure reduceState function used by scan.
+ */
 export const state$ = (): Observable<State> => {
     const svg = queryElement<SVGSVGElement>("#svgCanvas");
     const restartButton = queryElement<HTMLButtonElement>("#restartButton");
@@ -134,13 +192,25 @@ export const state$ = (): Observable<State> => {
         pauseClick$.pipe(mapToValue("toggle")),
         restartClick$.pipe(mapToValue("resume")),
     ).pipe(
+        // Pause clicks toggle the value; restarting always resumes the game.
         scan(
             (isPaused, command) => (command === "toggle" ? !isPaused : false),
             false,
         ),
         startWith(false),
+        // Both clocks need the latest pause value without separate state.
         shareReplay({ bufferSize: 1, refCount: true }),
     );
+
+
+/*
+ * These streams connect the game timer, target spawning, and keyboard
+ * controls. activePulse$ produces ticks while the game is running,
+ * tick$ turns each pulse into a Tick event, and spawnTarget$ creates
+ * the target events. digitKey$ listens for keys 1-8 and converts a
+ * valid key press into a FlipBinaryDigit event for the matching bit.
+ */
+
     const activePulse$ = createActivePulseStream(isPaused$);
     const tick$ = activePulse$.pipe(mapToValue({ type: "Tick" }));
     const spawnTarget$ = createRestartingTargetStream(
@@ -149,6 +219,7 @@ export const state$ = (): Observable<State> => {
         activePulse$,
     );
     const digitKey$ = fromEvent<KeyboardEvent>(document, "keydown").pipe(
+        // Ignore held-key repeats and accept only the eight digit controls.
         filter(({ code, repeat }) => !repeat && /^Digit[1-8]$/.test(code)),
         map(
             ({ code }): GameEvent => ({
@@ -157,7 +228,17 @@ export const state$ = (): Observable<State> => {
             }),
         ),
     );
+
+/*
+ * digitClick$ listens for mouse clicks on the binary digits, finds which
+ * digit was clicked, checks that the index is valid, and turns it into a
+ * FlipBinaryDigit event. restart$ and pause$ convert button clicks into
+ * Restart and TogglePause events. merge combines all game events into one
+ * stream, and scan uses each event to produce the next game state.
+ */
+
     const digitClick$ = fromEvent<MouseEvent>(svg, "click").pipe(
+        // Event delegation handles clicks on either a digit's text or rectangle.
         map(getClickedDigitElement),
         filter((element): element is Element => element !== null),
         map(element => Number(element.getAttribute("data-digit-index"))),
@@ -179,5 +260,6 @@ export const state$ = (): Observable<State> => {
         digitClick$,
         restart$,
         pause$,
+        // scan is the state-management boundary: every event creates a state.
     ).pipe(scan(reduceState, startingState), startWith(startingState));
 };
