@@ -64,9 +64,8 @@ Avoid separating code into too many files as it makes it hard to mark. The maxim
 src/
   main.ts        -- main code logic inc. core game loop
   types.ts       -- common types and type aliases
-  util.ts        -- util functions
+  dom.ts         -- safe DOM element lookup
   state.ts       -- state processing and transformation
   view.ts        -- rendering
   observable.ts  -- functions to create Observable streams
 ```
-#testing if commit messages work properly.
