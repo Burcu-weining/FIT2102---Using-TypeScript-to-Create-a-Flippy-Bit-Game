@@ -669,14 +669,14 @@ const render = (): ((state: State) => void) => {
         {
             id: "scoreTarget",
             element: document.querySelector(
-                "#challengeScoreTen",
+                "#challengeScoreTarget",
             ) as HTMLElement,
             description: goals => `Reach score ${goals.scoreTarget}`,
         },
         {
             id: "timedTarget",
             element: document.querySelector(
-                "#challengeFastFive",
+                "#challengeTimedTarget",
             ) as HTMLElement,
             description: goals =>
                 `Solve ${goals.fastTargetCount} in ${
@@ -686,7 +686,7 @@ const render = (): ((state: State) => void) => {
         {
             id: "flawlessTarget",
             element: document.querySelector(
-                "#challengeScoreTwenty",
+                "#challengeFlawlessTarget",
             ) as HTMLElement,
             description: goals =>
                 `Reach score ${goals.flawlessScoreTarget} without a mistake`,
