@@ -17,8 +17,8 @@ const UINT32_RANGE = 0x1_0000_0000;
  *
  * The same starting seed always produces the same result. The function also
  * returns nextSeed, which is used the next time another random number
- * is needed. This lets the game create different random numbers without 
- * repeatedly calling math.random or changing a shared variable.
+ * is needed. This lets the game create different random numbers without
+ * repeatedly calling Math.random or changing a shared variable.
  */
 export const randomInteger = (
     seed: number,
@@ -58,7 +58,7 @@ export const generateChallengeGoals = (seed: number): ChallengeSetup => {
         CONSTANTS.MIN_FAST_SECONDS,
         CONSTANTS.MAX_FAST_SECONDS,
     );
-    //choose the score goal without making a mistake (the challange)
+    //choose the score goal without making a mistake (the challenge)
     const flawlessResult = randomInteger(
         fastSecondsResult.nextSeed,
         CONSTANTS.MIN_FLAWLESS_SCORE,
@@ -81,7 +81,7 @@ export const generateChallengeGoals = (seed: number): ChallengeSetup => {
 
 /*
  creates the first seed when the page starts. This is the only 
- place where the game calls math.random. After this point,
+ place where the game calls Math.random. After this point,
  randomInteger uses the seed and returns a new seed using 
  the previous seed
  */
@@ -117,9 +117,6 @@ export const initialState: State = {
     gameEnd: false,
 };
 
-/* 
-changes a binary digit from 0 to 1, or from 1 to 0. 
-*/
 export const flipBit = (bit: Bit): Bit => (bit === 0 ? 1 : 0);
 
 /* 
@@ -144,7 +141,7 @@ export const flipBinaryDigit = (
     updateBit(binaryDigits[7], 7, selectedIndex),
 ];
 /*
-flipbit only changes one bit, anf flipbinarydigit receives all 8 digits
+flipbit only changes one bit, and flipbinarydigit receives all 8 digits
 and the position selected by the player, and it creates a new 8 digit group 
 where only the selected bits are changed.
 */
@@ -233,7 +230,7 @@ export const targetSpeed = (elapsedTicks: number): number =>
 export const updateCompletedChallenges = (
     state: State,
 ): ReadonlyArray<ChallengeId> => {
-    //if challange completed, then true, if not, then false
+    //if challenge completed, then true, if not, then false
     const challengeResults: ReadonlyArray<readonly [ChallengeId, boolean]> = [
         //complete when the current score reaches the random score goal
         ["scoreTarget", state.score >= state.challengeGoals.scoreTarget],
@@ -281,13 +278,13 @@ const resolveCorrectTarget = (
         //gives one point and record one more solved target
         score: state.score + 1,
         targetsSolved: state.targetsSolved + 1,
-        //adds to the timed count only if the answer was given and correct before the 
-        //time limit
+        //adds to the timed count only if the answer was given and correct
+        //before the time limit
         fastTargetsSolved:
             state.fastTargetsSolved + (matchedDuringChallenge ? 1 : 0),
     };
 
-    //checks whether this new score has ant matching challange requirements
+    //checks whether this new score has any matching challenge requirements
     return {
         ...matchedState,
         completedChallenges: updateCompletedChallenges(matchedState),
@@ -325,7 +322,8 @@ const advanceActiveState = (state: State): State => {
     const lowestTarget = getLowestTarget(movedState.targets);
 
     //with no target, only movement and time need updating. If the lowest target
-    //has not reached the line, keep moving. Otherwise, check the player's answer
+    //has not reached the line, keep moving. Otherwise, check the player's
+    //answer
     return lowestTarget === undefined
         ? movedState
         : lowestTarget.y + TARGET.HEIGHT < CONSTANTS.CHECK_LINE_Y

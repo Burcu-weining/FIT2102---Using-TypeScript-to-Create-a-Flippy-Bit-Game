@@ -1,5 +1,5 @@
 /*
-The dom file hadles finding required HTML or SVG elements on the webpage 
+The dom file handles finding required HTML or SVG elements on the webpage 
 in a reusable and type-safe way.
 */
 
@@ -13,8 +13,9 @@ const missingElement = (selector: string): never => {
 /*
 A generic function, ElementType represents the particular kind of element we
 expect to find
-ElementType extends Element -> means the supplied type must be a valid browser 
-element type. It prevents unrelated types such as number or state from being used.
+ElementType extends Element -> means the supplied type must be a valid browser
+element type. It prevents unrelated types such as number or state from being
+used.
 */
 export const queryElement = <ElementType extends Element>(
     selector: string,

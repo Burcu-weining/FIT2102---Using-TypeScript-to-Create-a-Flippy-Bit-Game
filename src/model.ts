@@ -13,7 +13,7 @@ export const VIEWPORT = {
 } as const;
 
 /*
-Defining the size for each hexa-deciaml boxes
+Defining the size for each hexadecimal boxes
 */
 export const TARGET = {
     WIDTH: 64,
@@ -56,16 +56,16 @@ export type FallingTarget = Readonly<{
 }>;
 
 /*
-This defines the challange the player can try to beat
+This defines the challenge the player can try to beat
 while playing the game
 */
 
 /*
-ChallangeId is used sot the game can identify which challange has 
-been completed. When a challange is complete, the ID is stored.
-So now, the game can use that ID to remember which challange is complete,
+ChallengeId is used so the game can identify which challenge has 
+been completed. When a challenge is complete, the ID is stored.
+So now, the game can use that ID to remember which challenge is complete,
 display the trophy, and turn the text green. 
-THis prevents the same challange being added more than once
+This prevents the same challenge being added more than once
 */
 export type ChallengeId = "scoreTarget" | "timedTarget" | "flawlessTarget";
 export type ChallengeGoals = Readonly<{

@@ -112,7 +112,6 @@ const scheduleTarget = (
  * the updated seed and ID, while map returns only the GameEvent needed
  * by the rest of the game.
  */
-
 const createTargetStream = (
     initialSeed: number,
     activePulse$: Observable<number>,
@@ -137,7 +136,6 @@ const createTargetStream = (
  different target sequence, and switchMap stops the old target stream
  before starting a new one with the new seed.
  */
-
 export const createRestartingTargetStream = (
     initialSeed: number,
     restart$: Observable<unknown>,
@@ -209,7 +207,6 @@ export const state$ = (): Observable<State> => {
      * the target events. digitKey$ waits for keys 1-8 and converts a
      * the press into a FlipBinaryDigit event for the matching bit.
      */
-
     const activePulse$ = createActivePulseStream(isPaused$);
     const tick$ = activePulse$.pipe(mapToValue({ type: "Tick" }));
     const spawnTarget$ = createRestartingTargetStream(
@@ -229,15 +226,15 @@ export const state$ = (): Observable<State> => {
     );
 
     /*
-     * digitClick$ is for mouse clicks on the binary digits, finds which
-     * digit was clicked, checks that the index is valid, and turns it into a
-     * FlipBinaryDigit event. restart$ and pause$ convert button clicks into
-     * Restart and TogglePause events. merge combines all game events into one
-     * stream, and scan uses each event to produce the next game state.
+     digitClick$ is for mouse clicks on the binary digits, finds which
+     digit was clicked, checks that the index is valid, and turns it into a
+     FlipBinaryDigit event. restart$ and pause$ convert button clicks into
+     Restart and TogglePause events. merge combines all game events into one
+     stream, and scan uses each event to produce the next game state.
      */
-
     const digitClick$ = fromEvent<MouseEvent>(svg, "click").pipe(
-        // Event delegation handles clicks on either a digit's text or rectangle.
+        // Event delegation handles clicks on either a digit's text or
+        // rectangle.
         map(getClickedDigitElement),
         filter((element): element is Element => element !== null),
         map(element => Number(element.getAttribute("data-digit-index"))),

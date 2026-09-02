@@ -1,6 +1,6 @@
 /*
-This gives typescript access to Vite's type declaations. It is
-placed before the imports because typescript reference 
+This gives TypeScript access to Vite's type declarations. It is
+placed before the imports because TypeScript reference 
 must appear at the start of the file
 */
 /// <reference types="vite/client" />
@@ -20,7 +20,7 @@ import { render } from "./view";
 
 /*
 These functions are defined in observable.ts, but main.ts
-makes them avaliable from one central location
+makes them available from one central location
 */
 export {
     createActivePulseStream,
@@ -56,7 +56,8 @@ export type {
     State,
 } from "./model";
 
-// The following simply runs your main function on window load.  Make sure to leave it in place.
+// The following simply runs your main function on window load.
+// Make sure to leave it in place.
 // You should not need to change this, beware if you are.
 if (typeof window !== "undefined") {
     // Observable: wait for first user click

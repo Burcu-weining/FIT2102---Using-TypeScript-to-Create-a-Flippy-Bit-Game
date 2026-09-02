@@ -18,12 +18,12 @@ before the lowest target reaches that line.
 - Click on the restart game button to start a new game at any time, even when the game is running.
 - Multiple targets coming donw, with the lowest target haveing to be solved first.
 - One point for every correct binary number entered, and it shows up on the screen
-- Game over when the binary value does not match the target at the check line, or when there is no input
+- Game over when the binary value does not match the target at the check line, or when there is no input(excluding when 00000000 is the correct answer)
 
 ## Implemented Features
 
 - 8 binary digits and hexadecimal falling targets
-- Random target values from 00 to FF
+- Random target values from 0 to FF
 - Random target spawn in between 1-3 seconds
 - Random target falling positions within the canvas of the game (left to right)
 - Gradually increasing target speed, the longer the player goes, the faster the game becomes
@@ -97,8 +97,6 @@ before the lowest target reaches that line.
 
 ## Advanced Challanges - HD Requirement
 
-I implemented some new ideas I have in mind and a guaranteed HD requirement to be safe.
-
 - Pause Button: When the player is playing the game and they want to pause it, they can
   click on the button and the game will pause while saving the histroy of the previous
   game scores or how far they are at the challanges. If the player wants to start the
@@ -108,12 +106,12 @@ I implemented some new ideas I have in mind and a guaranteed HD requirement to b
   tracker. The user can see their score tracker.
 
 - Random Challange: Each time the player opens the game and restarts the game, there is
-  a 3 challanges the user can try to accomplish. If the challange is accomplished, the
-  screen shows "you beat the challange"
+  a 3 challange section the user can try to accomplish. If the challange is accomplished,
+  a trophy appears indicating the challange is completed.
 
 ## AI Citation
 
-## I have used Chatgpt, Claude in this assignment to give me ideas of how to implment my ideas into code, checking if the codes are in proper functional and FRP style. I also used Chatgpt to generate code that I can further develop from. Eventually, I also used Chatgpt to check I did not do or implement anything that is not allowed in this assignment.
+I have used Chatgpt, Claude in this assignment to give me ideas of how to implment my ideas into code, checking if the codes are in proper functional and FRP style. I also used Chatgpt to generate code that I can further develop from. Eventually, I also used Chatgpt to check I did not do or implement anything that is not allowed in this assignment.
 
 Setup (requires node.js):
 

@@ -50,7 +50,9 @@ h1 {
 }
 
 main {
-    /* The main panel wraps on narrow screens so side content remains readable. */
+    /* The main panel wraps on narrow screens so side content 
+    remains readable
+    */
     background-color: #f8fafc;
     border: 1px solid #c7d2fe;
     border-radius: 1em;
