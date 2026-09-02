@@ -7,10 +7,10 @@ import type {
 } from "./model";
 import { queryElement } from "./dom";
 
-/**
- * Moves an SVG message to the end of its parent element.
- * SVG elements added later are drawn on top of earlier elements. This keeps
- * messages such as "Paused" and "Game Over" in front of falling targets.
+/*
+ * moves an SVG message to the back.
+ * This keeps messages "Paused" and "Game Over" in front
+ * so other things dont block it
  */
 const bringToForeground = (element: SVGElement): void => {
     element.parentNode?.appendChild(element);
@@ -19,7 +19,7 @@ const bringToForeground = (element: SVGElement): void => {
 /**
  * Changes one HTML or SVG attribute only when its value is different.
  * For example, a target's y attribute changes when that target moves down.
- * Skipping an unchanged value prevents unnecessary page updates.
+ * Skipping an unchanged value saves effeciency
  */
 const updateAttribute = (
     element: Element,
@@ -30,11 +30,21 @@ const updateAttribute = (
         ? undefined
         : element.setAttribute(name, value);
 
-/** Changes the text only when the new text is different. */
+/**
+ * shows the supplied text inside an HTML or SVG element.
+ * First, it compares the text already on the page with the new value. If both
+ * are the same, then nothing changes. If they are different,
+ * replaceChildren removes the old content and inserts the new text. It could
+ * change the score or the buttons
+ */
 const updateText = (element: Element, value: string): void =>
     element.textContent === value ? undefined : element.replaceChildren(value);
 
-/** Adds a CSS class when enabled is true and removes it when it is false. */
+/*
+updates the number or words shown on the page. Element is the page element
+to update, and value is the new text to display. It checks the current text and 
+only updates when it needs to be changed
+*/
 const applyClass = (
     element: Element,
     className: string,
@@ -53,50 +63,60 @@ const updateClass = (
         ? undefined
         : applyClass(element, className, enabled);
 
-/** Makes a hidden SVG message visible and places it above other elements. */
+/*
+ Makes a hidden SVG message visible and places it above other elements
+ reveal = shows the visual SVG object and make sure it appears above 
+ the other game graphics. 
+*/
 const reveal = (element: SVGElement): void => {
     element.setAttribute("visibility", "visible");
     bringToForeground(element);
 };
 
-/** Shows an SVG element only if it is not already visible. */
+/* 
+ shows an SVG element only if it is not visible. 
+*/
 const show = (element: SVGElement): void =>
     element.getAttribute("visibility") === "visible"
         ? undefined
         : reveal(element);
 
-/** Hides an SVG element only if it is not already hidden. */
+/*
+hides an SVG element only if it is not hidden. 
+*/
 const hide = (element: SVGElement): void =>
     updateAttribute(element, "visibility", "hidden");
 
-/**
- * Rebuilds the visible score-history list from the saved score numbers.
- * Each number becomes a list item such as "Game 1: 5".
+/*
+ * rebuilds the score-history list from the saved score
+ * Each number becomes a list item
  */
 const replaceScoreHistory = (
     list: HTMLOListElement,
     scores: ReadonlyArray<number>,
-    signature: string,
+    signature: string, //short string of the complete scores listed
 ): void => {
-    // map creates one new <li> element for every previous score.
+    // map creates one new <li> element for every previous score
     const items = scores.map((score, index) => {
         const item = document.createElement("li");
         item.textContent = `Game ${index + 1}: ${score}`;
         return item;
     });
 
-    // Replace the old list items with the newly created list items.
+    // replace the old list items with the new created list
     list.replaceChildren(...items);
-    // Remember which scores are displayed so they can be checked next time.
+    // remember which scores are displayed so they can be checked next time
     list.setAttribute("data-score-history", signature);
 };
 
-/** Updates the score history only when the array of scores has changed. */
+/*
+Updates the score history only when the array of scores has changed 
+*/
 const updateScoreHistory = (
     list: HTMLOListElement,
     scores: ReadonlyArray<number>,
 ): void => {
-    // Turn the scores into text that can be stored on the HTML list element.
+    // turn the scores into text that can be stored on the HTML list element
     const signature = JSON.stringify(scores);
 
     // Matching text means that the correct scores are already displayed.
@@ -105,16 +125,15 @@ const updateScoreHistory = (
         : replaceScoreHistory(list, scores, signature);
 };
 
-/**
- * Creates an SVG shape or text element and sets its starting attributes.
- * SVG elements need createElementNS rather than the normal createElement.
+/*
+creates visual objects for the game. e.g. a rectangle, text of hexa decimal
+numbers, the yellow check line.
  */
 const createSvgElement = (
-    namespace: string | null,
+    namespace: string | null, //tells the browser that the new object belongs to SVG rather than normal HTML
     name: string,
     properties: Record<string, string> = {},
 ): SVGElement => {
-    // Create the requested SVG element, such as a rectangle, text or line.
     const element = document.createElementNS(namespace, name) as SVGElement;
     // Add every property from the object as an attribute on the new element.
     Object.entries(properties).forEach(([key, value]) =>
@@ -123,33 +142,33 @@ const createSvgElement = (
     return element;
 };
 
-// A target is drawn using a rectangle and text showing its hexadecimal value.
+//target is made using a rectangle and text showing its hexadecimal value.
 type TargetElements = Readonly<{
     rectangle: SVGElement;
     text: SVGElement;
 }>;
 
-// A binary digit is drawn using a coloured rectangle and a 0 or 1 text element.
+//binary digit is made using a coloured rectangle and a 0 or 1 text element.
 type BinaryDigitElements = Readonly<{
     rectangle: SVGElement;
     text: SVGElement;
 }>;
 
-// Connects each challenge's name, HTML element and displayed sentence.
+// connects each challenge's name, HTML element and displayed sentence.
 type ChallengeElement = Readonly<{
     id: ChallengeId;
     element: HTMLElement;
     description: (goals: ChallengeGoals) => string;
 }>;
 
-/**
- * Sets up the visible parts of the game, then returns a function that displays
- * each new game state. The returned function runs whenever state$ produces a
- * State. This file changes the page; state.ts only calculates game data.
+/*
+ sets up the visible parts of the game, then returns a function that displays
+ each new game state. The returned function runs whenever state$ produces a
+ state
  */
 export const render = (): ((state: State) => void) => {
-    // Find the permanent elements that already exist in index.html.
-    // Saving them here means we do not search for them again on every game tick.
+    // find the permanent elements that already exist in index.html
+    // saving them here means we dont search for it again in every game tick
     const svg = queryElement<SVGSVGElement>("#svgCanvas");
     const gameOver = queryElement<SVGElement>("#gameOver");
     const pausedMessage = queryElement<SVGElement>("#paused");
@@ -159,7 +178,7 @@ export const render = (): ((state: State) => void) => {
     const emptyScoreHistory = queryElement<HTMLElement>("#emptyScoreHistory");
 
     // Match every challenge with its HTML element and the sentence that will
-    // describe its randomly generated goal.
+    // describe its randomly generated challange
     const challengeElements: ReadonlyArray<ChallengeElement> = [
         {
             id: "scoreTarget",
@@ -182,14 +201,16 @@ export const render = (): ((state: State) => void) => {
         },
     ];
 
-    // Make the SVG coordinate system match the game's width and height.
+    // make the SVG system match the games width and height.
     svg.setAttribute(
         "viewBox",
         `0 0 ${VIEWPORT.CANVAS_WIDTH} ${VIEWPORT.CANVAS_HEIGHT}`,
     );
 
-    // Create the yellow line where a falling target is checked against the
-    // binary number selected by the player.
+    /*
+    creates the yellow line where the target falling is checked
+    if the user entered the right binary number
+    */
     const checkLine = createSvgElement(svg.namespaceURI, "line", {
         x1: "0",
         y1: `${CONSTANTS.CHECK_LINE_Y}`,
@@ -200,21 +221,28 @@ export const render = (): ((state: State) => void) => {
         "stroke-dasharray": "8 5",
     });
 
-    // Create a group that will contain every falling target. This keeps the
-    // target shapes together and makes the SVG easier to organise.
+    /*
+thia part creates an empty SVG group for holding the falling
+target.
+svg.namespacedURI --> this tells the browser to make a SVG element
+rather than HTML object, and g means "group" in SVG.
+THe group is named targetLayer, and after creating it, appendChild 
+saves the group inside the SVG cnavas
+*/
     const targetLayer = createSvgElement(svg.namespaceURI, "g", {
         id: "targetLayer",
     });
 
-    // Add the check line and the empty target group to the SVG canvas.
+    // adds the check line and the empty target group to the SVG part
     svg.appendChild(checkLine);
     svg.appendChild(targetLayer);
 
-    // Divide the canvas width equally between the eight binary controls.
+    // divides the canvas width equally between the eight binary controls
     const digitWidth = VIEWPORT.CANVAS_WIDTH / CONSTANTS.DIGIT_COUNT;
 
-    // Create all eight controls. Each one contains a coloured rectangle and a
-    // text element that displays either 0 or 1.
+    /*creates all eight bits. Each contains a coloured rectangle and a
+text that displays either 0 or 1.
+*/
     const binaryDigitElements: ReadonlyArray<BinaryDigitElements> = Array.from(
         { length: CONSTANTS.DIGIT_COUNT },
         (_, index) => {
@@ -229,7 +257,7 @@ export const render = (): ((state: State) => void) => {
                 stroke: "black",
                 "stroke-width": "2",
             });
-            // Place the 0 or 1 text in the centre of its rectangle.
+            // places 0 or 1 in the middle of the box
             const text = createSvgElement(svg.namespaceURI, "text", {
                 "data-digit-index": String(index),
                 x: `${index * digitWidth + digitWidth / 2}`,
@@ -240,23 +268,25 @@ export const render = (): ((state: State) => void) => {
                 fill: "black",
             });
 
-            // Every digit starts at 0 before the first State is displayed.
+            // every digit should be 0 before the game begins
             text.textContent = "0";
-            // Add both visible parts of the digit to the SVG canvas.
+            // adds both visible parts of the digit to the SVG game.
             svg.appendChild(rectangle);
             svg.appendChild(text);
-            // Save both elements so future renders can update them directly.
+            // saves both elements so future renders can update them directly
             return { rectangle, text };
         },
     );
 
-    // Save each target's SVG elements under its unique target ID. On the next
+    // saves each target's SVG elements under a unique target ID. On the next
     // tick, the same elements can be moved instead of being created again.
     const targetElements = new Map<number, TargetElements>();
 
-    /** Creates the rectangle and hexadecimal text for one new target. */
+    /*
+     creates the rectangle and hexadecimal nuumber for a new target
+     */
     const createTargetElements = (target: FallingTarget): TargetElements => {
-        // Draw the white rounded rectangle at the target's current position.
+        // draws the white rectangle at the target's current position
         const rectangle = createSvgElement(svg.namespaceURI, "rect", {
             x: `${target.x}`,
             y: `${target.y}`,
@@ -267,7 +297,7 @@ export const render = (): ((state: State) => void) => {
             stroke: "black",
             "stroke-width": "2",
         });
-        // Draw the hexadecimal value in the centre of the rectangle.
+        // draws the hexadecimal value in the center of the rectangle
         const text = createSvgElement(svg.namespaceURI, "text", {
             x: `${target.x + TARGET.WIDTH / 2}`,
             y: `${target.y + TARGET.HEIGHT / 2 + 7}`,
@@ -277,15 +307,18 @@ export const render = (): ((state: State) => void) => {
             fill: "black",
         });
 
-        // Convert a number such as 173 into the displayed hexadecimal text AD.
+        //converts the number into the hexadecimal text in the game
         text.textContent = target.hexadecimalValue.toString(16).toUpperCase();
-        // Add both target parts to the target group on the canvas.
+        //adds both the box and the hexa number to the screen
         targetLayer.appendChild(rectangle);
         targetLayer.appendChild(text);
         return { rectangle, text };
     };
 
-    /** Removes both visible parts of a target and forgets its saved ID. */
+    /*
+    this code chunk removes the hexadecimal number and the box if the 
+    player matches the binary digit with the hexa number
+    */
     const removeTargetElements = (
         elements: TargetElements,
         id: number,
@@ -295,38 +328,45 @@ export const render = (): ((state: State) => void) => {
         targetElements.delete(id);
     };
 
-    // This returned function runs for every new State produced by state$.
+    //this return function runs whenever a new state is produced
     return (state: State): void => {
-        // Display the current score and the scores from previous games.
+        //shows the new score and also saves the previous scores
         updateText(scoreText, String(state.score));
         updateScoreHistory(scoreHistoryList, state.scoreHistory);
 
-        // Hide the "no previous scores" message when score history is available.
+        //hides the "no previous gmaes" line when there is score history
         emptyScoreHistory.hidden === state.scoreHistory.length > 0
             ? undefined
             : (emptyScoreHistory.hidden = state.scoreHistory.length > 0);
 
-        // Update the sentence and completion symbol for every challenge.
+
+        /*
+        this part updates the challange section. An id that identifies the challange, 
+        an HTML element, and a funciton that creates the sentence. 
+        The code goes through every challange and state.completedChallenges is an array
+        that checks if the challange is completed
+        */
+        //updates the sentence and completed symbol for every challenge
         challengeElements.forEach(({ id, element, description }) => {
-            // Check whether this challenge's ID is in the completed list.
+            //checks whether this challenge ID is in the completed list
             const isComplete = state.completedChallenges.includes(id);
-            // Find the symbol and sentence inside this challenge's HTML element.
+            //finds the symbol and sentence inside this challenge's HTML element
             const trophy = queryElement<HTMLElement>(".trophy", element);
             const challengeText = queryElement<HTMLElement>(
                 ".challengeText",
                 element,
             );
 
-            // A completed challenge becomes green and displays a trophy.
+            //completed challenge becomes green text and shows a trophy
             updateClass(element, "completed", isComplete);
             updateText(trophy, isComplete ? "🏆" : "○");
             updateText(challengeText, description(state.challengeGoals));
         });
 
-        // Update the number and colour displayed by each binary control.
+        //updates the number and colour of the binary
         binaryDigitElements.forEach(({ rectangle, text }, index) => {
             const currentBit = state.binaryDigits[index];
-            // Display a 1 with green and a 0 with red.
+            //shows a 1 with green and a 0 with red
             updateAttribute(
                 rectangle,
                 "fill",
@@ -335,18 +375,27 @@ export const render = (): ((state: State) => void) => {
             updateText(text, String(currentBit));
         });
 
-        // Collect the IDs of targets that still exist in the latest State.
+        /*
+        This code keeps the falling targets on the screen matching with the 
+        latest game state. It creates the rectangle and text for new targets, 
+        reuses and moves the existing target elements as they fall, and removes 
+        targets that have been solved. This avoids recreating every target on 
+        every game update.
+        */
+
+        //takes all the targets and extracts their id, so the rendering code
+        //can know which targets still exist in the game
         const activeTargetIds = new Set(state.targets.map(target => target.id));
 
-        // Draw a target if it is new, or find its existing SVG elements.
+        //draws a target if it is new, or find its existing SVG elements
         state.targets.forEach(target => {
             const existingElements = targetElements.get(target.id);
             const elements = existingElements ?? createTargetElements(target);
-            // Save newly created target elements so they can be reused next tick.
+            //save new created target elements so they can be reused next tick
             existingElements === undefined
                 ? targetElements.set(target.id, elements)
                 : undefined;
-            // Move the rectangle and text to the target's latest y-position.
+            //move the rectangle and word to the target's latest y position
             updateAttribute(elements.rectangle, "y", String(target.y));
             updateAttribute(
                 elements.text,
@@ -355,22 +404,22 @@ export const render = (): ((state: State) => void) => {
             );
         });
 
-        // Remove visible targets that are no longer in the latest State.
+        //removes visible targets that are no longer in the latest game
         targetElements.forEach((elements, id) => {
             activeTargetIds.has(id)
                 ? undefined
                 : removeTargetElements(elements, id);
         });
 
-        // Show Game Over only after the game has ended.
+        //shows Game Over only after the game ends
         state.gameEnd ? show(gameOver) : hide(gameOver);
-        // Show Paused only while paused and before the game has ended.
+        //shows Paused only while paused and before the game has ended
         state.isPaused && !state.gameEnd
             ? show(pausedMessage)
             : hide(pausedMessage);
-        // Tell the player whether the button will pause or resume the game.
+        //tells the player whether the button will pause or resume the game
         updateText(pauseButton, state.isPaused ? "Resume game" : "Pause game");
-        // Disable pausing after Game Over because the game is no longer running.
+        //disables pausing after Game Over because the game is not running anymore
         pauseButton.disabled === state.gameEnd
             ? undefined
             : (pauseButton.disabled = state.gameEnd);

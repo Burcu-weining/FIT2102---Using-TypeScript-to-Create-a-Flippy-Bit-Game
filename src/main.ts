@@ -1,7 +1,7 @@
 /*
 This gives typescript access to Vite's type declaations. It is
-placed before the imports because typescript reference directives
-must appear near the beginning of the file
+placed before the imports because typescript reference 
+must appear at the start of the file
 */
 /// <reference types="vite/client" />
 
@@ -9,15 +9,14 @@ must appear near the beginning of the file
 main.ts is the entry point to the game. It connects the observable
 game-state stream to render and then exports important functions
 and types of testing.
-
-Keeping main.ts small makes the program easier to understand. It 
-shows how the application starts without mixing with randomness, 
-state transitions, Observable construction, or DOM rendering.
+Keeping main.ts small makes the program easier to understand. It
+separates the game functionalities.
 */
 import "./style.css";
 import { fromEvent, switchMap, take } from "rxjs";
 import { state$ } from "./observable"; //importing the game stream
-import { render } from "./view";       //render displays each emitted game state on the display
+import { render } from "./view";
+//render displays each emitted game state on the display
 
 /*
 These functions are defined in observable.ts, but main.ts
@@ -28,7 +27,6 @@ export {
     createRestartingTargetStream,
     state$,
 } from "./observable";
-
 
 export {
     binaryToDecimal,

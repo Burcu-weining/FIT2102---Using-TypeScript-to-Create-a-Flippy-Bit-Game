@@ -30,6 +30,8 @@ const createTestState = (changes: Partial<State> = {}): State => ({
     ...changes,
 });
 
+const TARGET_BEFORE_CHECK_LINE_Y = 300 - 36 - targetSpeed(0);
+
 describe("active game clock", () => {
     it("stops emitting while paused and resumes afterward", () => {
         vi.useFakeTimers();
@@ -267,7 +269,7 @@ describe("target movement", () => {
 
         const result = tick(state);
 
-        expect(result.targets[0].y).toBe(104);
+        expect(result.targets[0].y).toBe(100 + targetSpeed(0));
         expect(state.targets[0].y).toBe(100);
     });
 
@@ -282,8 +284,8 @@ describe("target movement", () => {
                     hexadecimalValue: 13,
                     x: 100,
 
-                    // At the starting speed, its bottom reaches 300.
-                    y: 260,
+                    // After one tick, the target's bottom reaches the line.
+                    y: TARGET_BEFORE_CHECK_LINE_Y,
                 },
             ],
         });
@@ -302,7 +304,7 @@ describe("target movement", () => {
                     id: 0,
                     hexadecimalValue: 13,
                     x: 100,
-                    y: 260,
+                    y: TARGET_BEFORE_CHECK_LINE_Y,
                 },
             ],
         });
@@ -345,8 +347,8 @@ it("adds one point to the existing score", () => {
                 hexadecimalValue: 13,
                 x: 100,
 
-                // At the starting speed, its bottom reaches 300.
-                y: 260,
+                // After one tick, the target's bottom reaches the line.
+                y: TARGET_BEFORE_CHECK_LINE_Y,
             },
         ],
     });
@@ -358,11 +360,11 @@ it("adds one point to the existing score", () => {
 
 describe("target speed", () => {
     it("starts at the slowest speed", () => {
-        expect(targetSpeed(0)).toBe(4);
+        expect(targetSpeed(0)).toBe(2.5);
     });
 
     it("increases gradually with survival time", () => {
-        expect(targetSpeed(600)).toBe(7);
+        expect(targetSpeed(600)).toBe(6.25);
     });
 
     it("reaches the maximum speed after two minutes", () => {
@@ -381,7 +383,7 @@ describe("challenges", () => {
         id: 0,
         hexadecimalValue: 13,
         x: 100,
-        y: 260,
+        y: TARGET_BEFORE_CHECK_LINE_Y,
     };
 
     it("generates the same challenge goals from the same seed", () => {

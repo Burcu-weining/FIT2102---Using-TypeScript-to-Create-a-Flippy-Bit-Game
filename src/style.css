@@ -1,6 +1,7 @@
 :root {
     /* Establish the page background and space around the game panel. */
-    background-color: rgb(161, 161, 161);
+    background: linear-gradient(135deg, #dbeafe, #ede9fe);
+    color: #172554;
     padding: 2em;
     padding-top: 4em;
 }
@@ -28,11 +29,9 @@ h1 {
     font-size: 3em;
     font-family: arial, helvetica, sans-serif;
     font-weight: bolder;
-    background-color: rgb(214, 214, 214);
-    border-radius: 0.05em;
-    padding: 0.1em 0.1em 0.1em 0.1em;
-    box-shadow: 0em 0em 0.15em rgb(211, 211, 211);
-    text-shadow: 0em 0em 1px rgb(68, 68, 68);
+    color: #312e81;
+    margin: 0 0 0.5em;
+    text-shadow: 0 2px 0 #ffffff;
 }
 
 .flex {
@@ -52,11 +51,12 @@ h1 {
 
 main {
     /* The main panel wraps on narrow screens so side content remains readable. */
-    background-color: rgb(238, 238, 238);
-    border-radius: 0.25em;
-    box-shadow: 0em 0em 0.5em rgb(20, 20, 20);
+    background-color: #f8fafc;
+    border: 1px solid #c7d2fe;
+    border-radius: 1em;
+    box-shadow: 0 1em 2.5em rgba(30, 41, 59, 0.2);
     flex-wrap: wrap;
-    padding: 1em;
+    padding: 1.25em;
 }
 
 /* https://stackoverflow.com/questions/6088409/svg-drop-shadow-using-css3 */
@@ -66,8 +66,8 @@ main {
 }
 
 svg {
-    border-radius: 0.1em;
-    border: 5px solid rgb(77, 77, 77);
+    border: 5px solid #312e81;
+    border-radius: 0.75em;
 }
 
 svg rect {
@@ -76,30 +76,63 @@ svg rect {
 }
 
 #svgCanvas {
-    background-color: rgb(154, 154, 154);
+    background: linear-gradient(#bfdbfe, #ddd6fe);
+}
+
+#sideBar {
+    background-color: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 0.75em;
+    padding: 1em;
 }
 
 #info {
-    /* Keep the controls and score panel a consistent width beside the canvas. */
-    width: 160px;
-    margin-top: 1em;
+    /* A wider panel keeps each challenge description on one line. */
+    margin-top: 0;
+    width: 320px;
 }
 
 #info > .text {
+    background-color: #ffffff;
+    border-radius: 0.6em;
+    color: #312e81;
     font-weight: bold;
+    padding: 0.8em;
 }
 
 #restartButton,
 #pauseButton {
+    background-color: #4f46e5;
+    border: 0;
+    border-radius: 0.6em;
+    color: #ffffff;
     cursor: pointer;
     font-size: 1em;
     font-weight: bold;
     padding: 0.6em;
 }
 
+#restartButton:hover,
+#pauseButton:hover {
+    background-color: #3730a3;
+}
+
+#pauseButton:disabled {
+    background-color: #94a3b8;
+    cursor: not-allowed;
+}
+
+#challenges,
+#scoreHistoryPanel {
+    background-color: #ffffff;
+    border-radius: 0.6em;
+    padding: 0.8em;
+}
+
 #challenges h2 {
+    color: #312e81;
     font-size: 1.1em;
-    margin-bottom: 0.5em;
+    margin: 0 0 0.6em;
 }
 
 #challenges ul {
@@ -112,8 +145,15 @@ svg rect {
 }
 
 #challenges li {
+    align-items: center;
+    background-color: #eef2ff;
+    border-left: 4px solid #818cf8;
+    border-radius: 0.35em;
+    display: flex;
     font-size: 0.9em;
     line-height: 1.3;
+    padding: 0.55em;
+    white-space: nowrap;
 }
 
 #challenges li.completed {
@@ -127,8 +167,9 @@ svg rect {
 }
 
 #scoreHistoryPanel h2 {
+    color: #312e81;
     font-size: 1.1em;
-    margin-bottom: 0.5em;
+    margin: 0 0 0.5em;
 }
 
 #scoreHistoryPanel p {
@@ -137,15 +178,19 @@ svg rect {
 }
 
 #scoreHistory {
+    list-style: none;
     margin: 0;
     max-height: 8em;
     overflow-y: auto;
-    padding-left: 1.8em;
+    padding: 0;
 }
 
 #scoreHistory li {
+    background-color: #eef2ff;
+    border-radius: 0.35em;
     font-size: 0.9em;
     margin-bottom: 0.3em;
+    padding: 0.4em 0.6em;
 }
 
 .left {
@@ -167,4 +212,20 @@ svg rect {
 
 [data-digit-index] {
     cursor: pointer;
+}
+
+@media (max-width: 1050px) {
+    :root {
+        padding: 1em;
+    }
+
+    main {
+        justify-content: center;
+    }
+
+    #sideBar,
+    #info {
+        box-sizing: border-box;
+        width: 610px;
+    }
 }

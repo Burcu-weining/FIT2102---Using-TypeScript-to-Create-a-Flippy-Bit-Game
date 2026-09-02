@@ -14,7 +14,7 @@ const missingElement = (selector: string): never => {
 A generic function, ElementType represents the particular kind of element we
 expect to find
 ElementType extends Element -> means the supplied type must be a valid browser 
-element type. It prevents unrelated types such as number or State from being used.
+element type. It prevents unrelated types such as number or state from being used.
 */
 export const queryElement = <ElementType extends Element>(
     selector: string,

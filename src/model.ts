@@ -4,7 +4,6 @@ types, and permitted events used throughout the game.
 It does not run the game or change its state
 */
 
-
 /*
 viewpoint stores the dimensions of the SVG game pixels.
 */
@@ -24,12 +23,12 @@ export const TARGET = {
 export const CONSTANTS = {
     DIGIT_COUNT: 8,
     TICK_RATE_MS: 100,
-    STARTING_TARGET_SPEED: 4,
+    STARTING_TARGET_SPEED: 2.5,
     MAX_TARGET_SPEED: 10,
     TICKS_TO_MAX_SPEED: 1200,
     MIN_TARGET_SPAWN_MS: 1000,
     MAX_TARGET_SPAWN_MS: 3000,
-    MAX_TARGET_VALUE: 0xff,  //255
+    MAX_TARGET_VALUE: 0xff, //255
     CHECK_LINE_Y: 300,
     MIN_SCORE_CHALLENGE: 8,
     MAX_SCORE_CHALLENGE: 12,
@@ -59,6 +58,14 @@ export type FallingTarget = Readonly<{
 /*
 This defines the challange the player can try to beat
 while playing the game
+*/
+
+/*
+ChallangeId is used sot the game can identify which challange has 
+been completed. When a challange is complete, the ID is stored.
+So now, the game can use that ID to remember which challange is complete,
+display the trophy, and turn the text green. 
+THis prevents the same challange being added more than once
 */
 export type ChallengeId = "scoreTarget" | "timedTarget" | "flawlessTarget";
 export type ChallengeGoals = Readonly<{
