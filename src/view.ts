@@ -16,7 +16,7 @@ const bringToForeground = (element: SVGElement): void => {
     element.parentNode?.appendChild(element);
 };
 
-/**
+/*
  * Changes one HTML or SVG attribute only when its value is different.
  * For example, a target's y attribute changes when that target moves down.
  * Skipping an unchanged value saves efficiency
@@ -30,7 +30,7 @@ const updateAttribute = (
         ? undefined
         : element.setAttribute(name, value);
 
-/**
+/*
  * shows the supplied text inside an HTML or SVG element.
  * First, it compares the text already on the page with the new value. If both
  * are the same, then nothing changes. If they are different,
@@ -243,7 +243,8 @@ export const render = (): ((state: State) => void) => {
     // divides the canvas width equally between the eight binary controls
     const digitWidth = VIEWPORT.CANVAS_WIDTH / CONSTANTS.DIGIT_COUNT;
 
-    /*creates all eight bits. Each contains a coloured rectangle and a
+    /*
+    creates all eight bits. Each contains a coloured rectangle and a
       text that displays either 0 or 1.
     */
     const binaryDigitElements: ReadonlyArray<BinaryDigitElements> = Array.from(
