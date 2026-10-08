@@ -1,8 +1,5 @@
 # Assignment 1 - FIT2102 Flippy Bit
 
-Name: Tu Wei Ning
-Student ID: 35175257
-
 ## Game Overview
 
 Flippy Bit is an eight-bit binary digit matching game implemented in TypeScript with
@@ -10,6 +7,14 @@ RxJS and Functional Programming. Hexadecimal targets fall toward a
 check line at the bottom and acts like a finish line, and the player must type the
 binary digits to the matching value using keyboard 1-8 to flip between 0 and 1
 before the lowest target reaches that line.
+
+## Technologies Used
+- TypeScript — Game logic, state management, and type safety
+- RxJS — Reactive event streams and user input
+- Functional Programming — State transformations and game logic
+- HTML, CSS, SVG — Interface and game rendering
+- Vite — Development and build tools
+- Vitest — Automated testing
 
 ## Basic Game Rule Rundown
 
@@ -19,6 +24,22 @@ before the lowest target reaches that line.
 - Multiple targets coming donw, with the lowest target haveing to be solved first.
 - One point for every correct binary number entered, and it shows up on the screen
 - Game over when the binary value does not match the target at the check line, or when there is no input(excluding when 00000000 is the correct answer)
+
+## Getting Started
+
+Prerequisites: Node.js and npm
+
+Clone the repository and navigate to the project directory.
+
+Install dependencies:
+npm install
+
+Start the application:
+npm 
+Open the local URL displayed in the terminal.
+
+Run automated tests:
+npm run test:run
 
 ## Implemented Features
 
@@ -140,3 +161,7 @@ npx prettier . --write
 The configuration for this is set in `.prettierrc.json`. Feel free to change this to your heart's desire, but try to ensure it still fits the assignment guidelines.
 
 If you are using VS Code, you can also install the [Prettier extension](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode). This skeleton code is set up to automatically format your code on save. You can disable this in `.vscode/settings.json` by changing `"editor.formatOnSave": true` to `"editor.formatOnSave": false`.
+
+## AI Assistance Disclosure
+
+ChatGPT and Claude were used during development for brainstorming, generating code suggestions, reviewing functional programming approaches, and checking implementation requirements. AI-generated suggestions were further reviewed and developed during the project.
